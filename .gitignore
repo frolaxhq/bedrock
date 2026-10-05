@@ -1,4 +1,10 @@
 /vendor
+node_modules/
+dist/
+/packages/frontend/dist
+/packages/frontend/e2e/.artifacts
+*.tgz
+/modules
 /build
 /.phpunit.cache
 /.phpunit.result.cache

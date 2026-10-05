@@ -1,0 +1,21 @@
+{
+    "schema": 1,
+    "key": "alpha",
+    "name": "Alpha Module",
+    "version": "1.2.0",
+    "description": "A valid fixture module.",
+    "provider": "Frolax\\Bedrock\\Tests\\Fixtures\\Modules\\Alpha\\AlphaServiceProvider",
+    "autoload": {
+        "psr-4": {
+            "Frolax\\Bedrock\\Tests\\Fixtures\\Modules\\Alpha\\": "./"
+        }
+    },
+    "requires": {},
+    "permissions": ["view"],
+    "settings": {"greeting": "default"},
+    "database": {
+        "migrations": true,
+        "seeders": true,
+        "seeder": "Frolax\\Bedrock\\Tests\\Fixtures\\Modules\\Alpha\\Database\\Seeders\\AlphaSeeder"
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "schema": 1,
+    "key": "beta",
+    "name": "Beta Module",
+    "version": "1.0.0",
+    "provider": "Frolax\\Bedrock\\Tests\\Fixtures\\Modules\\Beta\\BetaServiceProvider",
+    "autoload": {
+        "psr-4": {
+            "Frolax\\Bedrock\\Tests\\Fixtures\\Modules\\Beta\\": "./"
+        }
+    },
+    "requires": {"alpha": ">=1.0.0"}
+}

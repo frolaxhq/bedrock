@@ -1,7 +1,7 @@
-laravel: '@testbench'
+laravel: './workbench'
 
 providers:
-  # - Workbench\App\Providers\WorkbenchServiceProvider
+  - Frolax\Bedrock\BedrockServiceProvider
 
 migrations:
   - workbench/database/migrations
@@ -20,6 +20,7 @@ workbench:
     components: false
     factories: true
     views: false
+    config: true
   build:
     - asset-publish
     - create-sqlite-db
@@ -27,7 +28,3 @@ workbench:
     - migrate-fresh
   assets:
     - laravel-assets
-  sync:
-    - from: storage
-      to: workbench/storage
-      reverse: true

@@ -1,0 +1,20 @@
+import { IconBox } from '@tabler/icons-react';
+import { defineBedrockModule, defineNavigation, navigationItem } from '@frolax/bedrock/module';
+import type { ComponentType } from 'react';
+
+const frontend = defineBedrockModule({
+    pages: import.meta.glob<{ default: ComponentType<Record<string, unknown>> }>('./pages/**/*.tsx'),
+    navigation: defineNavigation({
+        items: [
+            navigationItem({
+                key: '{{ key }}',
+                label: '{{ name }}',
+                route: '{{ key }}.index',
+                active: ['{{ key }}.*'],
+                icon: IconBox,
+            }),
+        ],
+    }),
+});
+
+export const { resolvePage, describeNavigation, materializeNavigation, resolveNavigation, runNavigationAction } = frontend;

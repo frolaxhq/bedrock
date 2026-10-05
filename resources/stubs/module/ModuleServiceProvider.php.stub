@@ -1,0 +1,14 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\{{ class }};
+
+use Frolax\Bedrock\Providers\Module\ModuleServiceProvider;
+
+class {{ class }}ServiceProvider extends ModuleServiceProvider
+{
+    protected string $moduleKey = '{{ key }}';
+
+    protected string $modulePath = __DIR__.'/..';
+}

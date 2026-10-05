@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\{{ class }}\Http\Controllers;
+
+use Frolax\Bedrock\Facades\Frontend;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class {{ class }}Controller
+{
+    public function __invoke(): Response
+    {
+        return Inertia::render(Frontend::page('{{ key }}', 'Index'));
+    }
+}

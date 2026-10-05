@@ -15,6 +15,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    name: Frontend runtime and reference module
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.19.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check and unit tests
+        run: |
+          pnpm frontend:generate:check
+          pnpm frontend:check
+          pnpm frontend:test
+
+      - name: Build and validate npm package
+        run: |
+          pnpm frontend:build
+          pnpm frontend:pack
+
+      - name: Build the canonical module
+        run: |
+          pnpm --filter @modules/example types
+          pnpm --filter @modules/example build
+
+      - name: Browser SSR and navigation
+        run: pnpm frontend:e2e
+
   tests:
     runs-on: ${{ matrix.os }}
 
@@ -22,12 +62,10 @@ jobs:
       fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest]
-        php: [8.3, 8.4, 8.5]
-        laravel: [12.*, 13.*]
+        php: [8.5]
+        laravel: [13.*]
         stability: [prefer-lowest, prefer-stable]
         include:
-          - laravel: 12.*
-            testbench: 10.*
           - laravel: 13.*
             testbench: 11.*
 
@@ -69,3 +107,56 @@ jobs:
       - name: Test Suite (Windows)
         if: runner.os == 'Windows'
         run: vendor/bin/pest
+
+  consumer-smoke:
+    runs-on: ubuntu-latest
+    name: Fresh Laravel 13 consumer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: dom, curl, libxml, mbstring, zip, fileinfo, sqlite, pdo_sqlite, bcmath, intl
+          tools: composer:v2
+          coverage: none
+
+      - name: Create Laravel consumer
+        run: composer create-project laravel/laravel consumer "^13.0" --no-interaction --prefer-dist
+
+      - name: Install Bedrock from the checkout
+        working-directory: consumer
+        run: |
+          composer config repositories.bedrock path ..
+          composer require frolaxhq/bedrock:@dev --with-all-dependencies --no-interaction
+
+      - name: Prepare local administration
+        working-directory: consumer
+        run: |
+          touch database/database.sqlite
+          php artisan vendor:publish --tag="bedrock-config" --force
+          sed -i '/^use Illuminate.*Notifiable;/a use Spatie\Permission\Traits\HasRoles;' app/Models/User.php
+          sed -i 's/use HasFactory, Notifiable;/use HasFactory, Notifiable, HasRoles;/' app/Models/User.php
+          sed -i "/'administration' => \[/,+1 s/'enabled' => false/'enabled' => true/" config/bedrock.php
+          php artisan bedrock:admin-install || test $? -eq 1
+          php artisan migrate --force
+          php artisan tinker --execute="\\App\\Models\\User::query()->create(['name' => 'Admin', 'email' => 'admin@example.test', 'password' => bcrypt('password')]);"
+          php artisan bedrock:admin-user admin@example.test
+          php artisan bedrock:admin-install --check
+          php artisan route:list --name=bedrock.admin
+
+      - name: Install and enable a local module
+        working-directory: consumer
+        run: |
+          mkdir -p modules
+          cp -R ../workbench/modules/example modules/example
+          php artisan module:install example
+          php artisan module:enable example
+          php artisan module:doctor example --json
+
+      - name: Exercise the module route
+        working-directory: consumer
+        run: php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class); $response = $kernel->handle(Illuminate\Http\Request::create("/example/health")); exit($response->getStatusCode() === 200 ? 0 : 1);'

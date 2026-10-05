@@ -4,58 +4,45 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock;
 
-use Frolax\Bedrock\Console\Commands\BedrockCommand;
+use Frolax\Bedrock\Providers\AdministrationServiceProvider;
+use Frolax\Bedrock\Providers\CoreServiceProvider;
+use Frolax\Bedrock\Providers\FrontendServiceProvider;
+use Frolax\Bedrock\Providers\ModulesServiceProvider;
+use Frolax\Bedrock\Providers\NavigationServiceProvider;
+use Frolax\Bedrock\Providers\PermissionsServiceProvider;
+use Frolax\Bedrock\Providers\SettingsServiceProvider;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * The package entry point.
+ *
+ * Each first-class capability owns its bindings, resources and commands. This
+ * provider only composes the shared core and the capabilities Bedrock ships.
+ */
 class BedrockServiceProvider extends ServiceProvider
 {
     /**
-     * Register any application services.
+     * The providers that make up the package.
+     *
+     * @var list<class-string<ServiceProvider>>
+     */
+    protected array $providers = [
+        CoreServiceProvider::class,
+        ModulesServiceProvider::class,
+        SettingsServiceProvider::class,
+        PermissionsServiceProvider::class,
+        FrontendServiceProvider::class,
+        NavigationServiceProvider::class,
+        AdministrationServiceProvider::class,
+    ];
+
+    /**
+     * Register the package providers.
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/bedrock.php', 'bedrock');
-
-        $this->app->singleton(Bedrock::class);
-    }
-
-    /**
-     * Bootstrap any application services.
-     */
-    public function boot(): void
-    {
-        $this->loadRoutesFrom(__DIR__.'/../routes/bedrock.php');
-
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'bedrock');
-
-        $this->loadTranslationsFrom(__DIR__.'/../lang', 'bedrock');
-
-        if (! $this->app->runningInConsole()) {
-            return;
+        foreach ($this->providers as $provider) {
+            $this->app->register($provider);
         }
-
-        $this->publishes([
-            __DIR__.'/../config/bedrock.php' => config_path('bedrock.php'),
-        ], ['bedrock', 'bedrock-config']);
-
-        $this->publishes([
-            __DIR__.'/../resources/views' => resource_path('views/vendor/bedrock'),
-        ], ['bedrock', 'bedrock-views']);
-
-        $this->publishes([
-            __DIR__.'/../lang' => $this->app->langPath('vendor/bedrock'),
-        ], ['bedrock', 'bedrock-lang']);
-
-        $this->publishes([
-            __DIR__.'/../public' => public_path('vendor/bedrock'),
-        ], ['bedrock', 'bedrock-assets']);
-
-        $this->publishesMigrations([
-            __DIR__.'/../database/migrations' => database_path('migrations'),
-        ], ['bedrock', 'bedrock-migrations']);
-
-        $this->commands([
-            BedrockCommand::class,
-        ]);
     }
 }

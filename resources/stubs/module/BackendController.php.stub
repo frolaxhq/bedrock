@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\{{ class }}\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+
+class {{ class }}Controller
+{
+    public function __invoke(): JsonResponse
+    {
+        return response()->json(['module' => '{{ key }}']);
+    }
+}

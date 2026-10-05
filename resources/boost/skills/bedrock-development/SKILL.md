@@ -9,33 +9,408 @@ metadata:
 
 # Bedrock
 
-Use this skill when a Laravel application needs to integrate the Bedrock package.
+Use this skill when a Laravel application needs to integrate Bedrock's module capability
+to author, package, install, enable and serve backend or React/Inertia feature modules.
 
-## Primary Goal
-
-- apply the `frolaxhq/bedrock` package's public API in the smallest correct way
+Bedrock scans a directory of self-contained module folders, records them in a registry
+table, and boots the service provider of every enabled module. Modules are not composer
+packages; each one is a folder with a `module.json` manifest.
 
 ## Workflow
 
 ### 1. Inspect the Laravel app context
 
-- confirm the app is a Laravel project
-- inspect the target code paths where the package should be applied
+- confirm the app is a Laravel 13 project on PHP 8.5 or newer
+- check whether the `modules` table or a `module:*` command namespace is already in use
+  before installing, since Bedrock registers both
 
-### 2. Apply the package's public API
+### 2. Install and publish
 
-Document how to integrate Bedrock here, replacing this placeholder with the integration steps for your package.
+```bash
+composer require frolaxhq/bedrock
+php artisan vendor:publish --tag="bedrock-config"
+php artisan migrate
+```
+
+The `bedrock` tag publishes the same configuration file. The `modules` migration is loaded
+from the package and is not publishable, so never copy it into the application's migrations
+directory.
+
+### 3. Configure
+
+Set the module root when the default does not fit. A relative path resolves against the
+application root; an absolute path is used as is.
+
+```php
+// config/bedrock.php
+'core' => [
+    // Set this only when a dev checkout needs a semantic version identity.
+    'version' => null,
+],
+'frontend' => [
+    'enabled' => true,
+    'client' => ['path' => 'public/vendor/bedrock/modules', 'url' => '/vendor/bedrock/modules'],
+    'server' => ['path' => 'storage/framework/bedrock/frontend'],
+    'development' => ['enabled' => false, 'path' => 'storage/framework/bedrock/frontend-dev'],
+    'panels' => ['user_attribute' => 'type', 'fallback' => 'default'],
+    'cache' => ['store' => null, 'key' => 'bedrock.frontend.registry', 'ttl' => 3600],
+],
+'modules' => [
+    'path' => 'modules',
+    'table' => 'modules',
+    'manifest' => 'module.json',
+    'bootstrap' => ['enabled' => true],
+    'install' => [
+        'max_archive_bytes' => 268435456,
+        'max_entries' => 10000,
+        'max_path_length' => 240,
+    ],
+    'locks' => ['store' => null, 'seconds' => 30, 'wait' => 5],
+    'cache' => [
+        'enabled' => true,
+        'store' => null,
+        'key' => 'modules.registry',
+        'ttl' => 3600,
+    ],
+],
+```
+
+Leave `modules.cache.enabled` on in production so boot does not query the registry on every
+request. The registry degrades to an empty set when the table or the cache store is
+missing, so an unmigrated app still boots.
+
+`core.version` normally stays `null`, which makes Bedrock use the version Composer reports.
+Set it explicitly when testing version-constrained modules against `dev-main`.
+
+### 4. Register a module
+
+Create `modules/<key>/module.json`. `key`, `name`, `version` and `provider` are required;
+`key` must match the directory name and is lowercase letters, digits and dashes.
+
+```json
+{
+    "key": "billing",
+    "name": "Billing",
+    "version": "1.0.0",
+    "provider": "Modules\\Billing\\BillingServiceProvider",
+    "requires": { "contacts": "^1.0" },
+    "autoload": {
+        "psr-4": { "Modules\\Billing\\": "src/" },
+        "files": ["src/helpers.php"]
+    },
+    "composer": {
+        "require": {
+            "php": "^8.5",
+            "laravel/framework": "^13.0",
+            "ext-json": "*"
+        }
+    },
+    "permissions": ["view", "manage"],
+    "database": {
+        "migrations": true,
+        "seeders": true,
+        "seeder": "Modules\\Billing\\Database\\Seeders\\BillingSeeder"
+    },
+    "frontend": {
+        "driver": "inertia-react",
+        "pages": "resources/js/pages",
+        "artifact": "dist/bedrock/frontend.json",
+        "requires": {
+            "react": "^19.0",
+            "react-dom": "^19.0",
+            "@inertiajs/react": "^3.0",
+            "@frolax/bedrock": "^1.0"
+        }
+    }
+}
+```
+
+Then discover and enable it:
+
+```bash
+php artisan module:discover
+php artisan module:install billing
+php artisan module:enable billing
+```
+
+### 5. Build the module provider
+
+Extend the base provider and set the module key and path. Every conventional location is
+loaded only when it exists: `routes/web.php`, `routes/api.php`, `database/migrations`,
+`resources/views`, `lang`, and `config/<key>.php`.
+
+```php
+namespace Modules\Billing;
+
+use Frolax\Bedrock\Providers\Module\ModuleServiceProvider;
+
+class BillingServiceProvider extends ModuleServiceProvider
+{
+    protected string $moduleKey = 'billing';
+
+    protected string $modulePath = __DIR__.'/..';
+}
+```
+
+Views and translations are namespaced under the module key: `billing::index` and
+`billing::messages.greeting`.
+
+### 6. Ship database resources
+
+Put migrations in `database/migrations` and seeders in `database/seeders`, then declare them
+in the manifest. Any install runs them before the module is registered — both
+`module:install {key}` for a directory already in the module root and the `--from` / `--zip`
+forms.
+
+```json
+"database": {
+    "migrations": true,
+    "seeders": true,
+    "seeder": "Modules\\Billing\\Database\\Seeders\\BillingSeeder"
+}
+```
+
+Bedrock registers manifest `autoload.psr-4` mappings before database work and loads
+`autoload.files` exactly once during trusted install or boot. No host Composer mapping is
+needed. Declaring `seeders` without a `seeder` runs no seeder. A failed migration or seeder
+keeps lifecycle `Discovered`, marks health `Failed`, and exits non-zero; copied files and the
+registry record remain for an explicit retry after repair.
+Migrations also load at runtime through `ModuleServiceProvider`, so an enabled module whose
+migrations were never run still has them registered with the migrator.
+
+### 7. Use the module gateway or facade
+
+```php
+use Frolax\Bedrock\Facades\Module;
+
+Module::enabled();
+Module::isEnabled('billing');
+Module::enable('billing');
+Module::diagnose('billing');
+Module::path();
+```
+
+Inject `Frolax\Bedrock\Module` when constructor injection is preferable. Resolve the
+lower-level `ModuleRegistry` or `ModuleManager` contracts only when replacing or working
+with one part of the capability.
+
+### 8. Author and package a full-stack module
+
+```bash
+php artisan module:make billing
+cd modules/billing
+pnpm install
+pnpm run types
+cd ../..
+php artisan module:validate modules/billing
+php artisan module:pack billing --output=dist/modules
+```
+
+Use `module:make billing --backend-only` when the module has no UI. Generation only creates
+files; it does not sync, migrate, install, or enable anything. `module:pack` requires an
+existing package-manager lockfile, runs the declared build without installing dependencies,
+creates a deterministic ZIP, and validates that ZIP through the same hardened installer.
+
+Frontend modules ship both browser federation and native ESM SSR artifacts. The generated
+artifact descriptor lists every runtime file and SHA-256 hash. Installation validates and
+publishes browser files to `public/vendor/bedrock/modules/<key>/<version>` and SSR files to
+`storage/framework/bedrock/frontend/<key>/<version>` before database work runs.
+
+### 9. Integrate a React/Inertia host
+
+The supported host is Laravel 13 with React 19, Inertia 3, TypeScript, Tailwind 4, and
+Vite 8. On a recognized React starter-kit layout:
+
+```bash
+php artisan frontend:install --check
+php artisan frontend:install --dry-run
+php artisan frontend:install
+pnpm install
+```
+
+The command changes declarations and integration files only; it never runs a package
+manager. It is transactional and idempotent, and refuses unfamiliar files. The host keeps
+React, React DOM, Inertia, and Bedrock's React/module/UI/theme runtimes as shared singletons,
+so module pages inherit the same context and overrides. Enabled frontend descriptors arrive
+in the reserved `__bedrock` Inertia prop and module pages use `module:{key}/{page}`.
+
+Bedrock's shared UI is generated with the official shadcn CLI using Base UI `base-nova`,
+Tabler icons, CSS-variable themes, and RTL output. Import package UI from
+`@frolax/bedrock/ui` so conventional host overrides apply everywhere. Known files under
+`resources/js/components`, `hooks`, and `layouts` are detected by exact
+lowercase kebab-case path; unrelated files are ignored.
+
+```bash
+php artisan ui:override --list
+php artisan ui:override button
+php artisan ui:override layouts/app-layout
+php artisan ui:override layouts/auth-layout
+```
+
+The command copies package source to the matching conventional path and never overwrites an
+existing file. No manual registry update is required. Use `ThemeProvider` for light, dark,
+system, and `direction="ltr|rtl"`; redefine semantic variables in host `app.css` to theme
+host, Bedrock, and module UI together. During package development, `pnpm workbench:dev`
+starts Laravel plus host and canonical-module Vite servers with Fast Refresh.
+
+Use `AuthLayout` for guest authentication flows and `AppLayout` for every authenticated user
+type. Bedrock reads the configured user attribute, shares the safe key as
+`__bedrock.viewer.panel`, and falls back to `default`. Build panel chrome conventionally:
+
+```text
+resources/js/panels/default/shell.tsx
+resources/js/panels/default/slots/sidebar.tsx
+resources/js/panels/default/slots/sidebar-footer.tsx
+resources/js/panels/admin/slots/sidebar-footer.tsx
+```
+
+Panel files default-export React components and require no registry. A type-specific panel
+inherits missing regions from `default`; `shell.tsx` replaces the complete shell. Use
+`PanelSlot`, `PanelSidebarTrigger`, and `usePanel()` when authoring advanced shells. Keep
+authorization in Laravel gates and policies—a panel key controls presentation only.
+
+Author host navigation in `resources/js/navigation.ts`; Bedrock's Vite plugin detects it
+without registration. Author module navigation beside its page glob in the single module
+entry using `defineBedrockModule`, `defineNavigation`, `navigationItem`, and
+`navigationAction` from `@frolax/bedrock/module`. Definitions, item `resolve()` callbacks,
+badges, visibility, children, and actions may be async and receive an `AbortSignal`.
+
+Never put `frontend.navigation` in `module.json`. `bedrock-artifact` imports the built SSR
+entry and calls only `describeNavigation()` to generate the static security envelope.
+Consumer installs validate this envelope and hashes without executing JavaScript. Laravel
+resolves named routes and filters panels and canonical permissions before the frontend;
+runtime code may alter presentation but cannot broaden that envelope.
+
+The package shell supplies `PanelBrand`, `PanelHeader`, `PanelBreadcrumbs`,
+`PanelNavigation`, and `PanelUserMenu`. Host files at
+`resources/js/components/panel-*.tsx` override those defaults globally. Precedence is the
+active panel slot, inherited `default` panel slot, conventional component override, then
+package default. The viewer prop contains only configured identity fields, panel, active
+Bedrock permissions, and existing profile/logout URLs—not the user model.
+
+```php
+use Frolax\Bedrock\Facades\Frontend;
+
+Frontend::all();
+Frontend::isAvailable('billing');
+Frontend::page('billing', 'Invoices/Index');
+```
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `module:discover` | Discover modules on disk and register the ones that are new. |
+| `module:list` | List registered modules with version, status and path. |
+| `module:sync` | Reconcile the registry with the modules found on disk. |
+| `module:doctor {key?} {--json}` | Run operational checks with human or stable JSON output. |
+| `module:make {key} {--backend-only}` | Generate a full-stack or backend-only module without lifecycle side effects. |
+| `module:validate {source} {--json}` | Validate source and artifacts without executing module code. |
+| `module:pack {key-or-path} {--output=}` | Build from installed dependencies and create a deterministic validated ZIP. |
+| `module:install {key}` | Register a module directory that already exists. |
+| `module:uninstall {key}` | Remove verified module code and its registry row while retaining data and published resources. |
+| `module:enable {key}` | Activate a registered module. |
+| `module:disable {key}` | Deactivate a module without removing files or data. |
+| `module:cache` | Rebuild the cached registry. |
+| `module:clear` | Clear the cached registry. |
+| `frontend:install {--check} {--dry-run}` | Integrate a recognized Laravel React host without running npm. |
+| `ui:override {target?} {--list}` | List or seed a conventional host frontend override. |
+
+The package is composed from focused providers. `BedrockServiceProvider` is the package
+entry point, `CoreServiceProvider` owns shared configuration, and `ModulesServiceProvider`
+owns the module gateway, bindings, commands, migration and runtime boot process.
+`FrontendServiceProvider` owns artifact management, the frontend registry/gateway, Inertia
+sharing, and host integration.
+`Providers\Module\ModuleServiceProvider` is the abstract base a module's provider extends; the
+package never registers it.
+
+`module:discover`, `module:sync` and `module:uninstall` exit non-zero when they report a
+problem, so they are safe to use in deployment scripts.
+
+## Lifecycle and events
+
+```
+Discovered → Installed → Enabled → Disabled
+```
+
+Listen for the lifecycle events to react to state changes:
+`ModuleDiscovered`, `ModuleInstalled`, `ModuleEnabled`, `ModuleDisabled`,
+`ModuleUninstalled`, `ModuleFailed`, `ModuleRecovered` and `ModuleBootFailed`. The last event
+is reserved for runtime provider registration failures.
+
+A module retains its lifecycle status while health becomes `Failed` when files, autoloading,
+providers, compatibility, dependencies, cycles, database work, locks or runtime bootstrap
+fail. Running `module:sync` clears health after repair without guessing a previous status.
+Enabling requires an installed, healthy module and registered, enabled, healthy, compatible
+dependencies. Disabling or uninstalling refuses to break registered dependents.
+
+An install recursively handles dependencies that are already present in the configured
+module directory, running each dependency before its dependents. Enabled providers boot in
+the same order. Missing local dependencies do not block copying a module for repair, but
+they do block enablement. A circular chain is rejected before that chain's database work
+runs, and the error reports the complete cycle.
 
 ## Rules, References, and Templates
 
-Read before executing:
-
-- no additional resource files for this skill
+- Read `config/bedrock.php` and the published `modules` migration before changing module
+  packaging in an app.
+- Do not hand-edit the registry table; go through the commands so the cache is invalidated.
 
 ## Examples
 
-- describe a representative integration scenario for Bedrock
+- Register a module and activate it:
+
+```bash
+php artisan module:discover
+php artisan module:install billing
+php artisan module:enable billing
+php artisan module:list
+```
+
+- Assert module behavior in a consuming app's test suite:
+
+```php
+expect(Module::isEnabled('billing'))->toBeTrue();
+```
+
+- Scaffold a module directory in a test with the shipped helper:
+
+```php
+use Frolax\Bedrock\Testing\Module\ModuleManifestFactory;
+
+$path = ModuleManifestFactory::for('demo')
+    ->with(['version' => '2.0.0'])
+    ->create(base_path('modules'));
+```
 
 ## Anti-patterns
 
-- do not document package internals here; keep the skill focused on adoption in Laravel apps
+- Do not install a module by editing the registry table directly; the cached enabled set
+  will be stale.
+- Do not expect `module.json` to allow arbitrary keys; unknown keys are ignored, and an
+  invalid key, version or missing required field makes the whole module rejected.
+- Do not expect a module's seeder to run by convention. `seeders: true` without a `seeder`
+  class name deliberately runs nothing; name the seeder in the manifest.
+- Do not add module namespaces to the host Composer file. Declare them in manifest
+  `autoload.psr-4`; a missing or unsafe target marks module health failed.
+- Do not use arbitrary constraint syntax. `core` and `requires` use Composer constraints,
+  and an invalid constraint rejects the complete manifest.
+- Do not assume `module:install` downloads missing dependencies. It recursively installs
+  only dependencies already present in the local module directory; marketplace delivery is
+  a later capability.
+- Do not build frontend modules on the consumer server. Publishers ship validated client
+  and SSR artifacts; production installs need neither Node nor a host rebuild.
+- Do not author navigation in `module.json` or duplicate its security metadata manually.
+  Define it in TypeScript and let `bedrock-artifact` generate the static descriptor.
+- Do not expose secret settings in an Inertia prop, a diagnostic response, an exception, or a
+  serialized public API result. Use `Settings::forInertia()` for safe UI payloads and only expose
+  a configured flag for secrets.
+- Do not remove a managed permission or an assigned Spatie grant merely because a module is
+  uninstalled. Mark its Bedrock catalog entry inactive; the Gate pre-check prevents use until
+  a later module install declares it again.
+- Do not bundle React, Inertia, or Bedrock's shared frontend runtimes into a module. Bedrock's
+  Vite helper declares them as host-provided singletons and validates manifest requirements
+  before loading.
+- Do not hand-edit recognized host entry files when `frontend:install` can compose
+  them safely; if it refuses a layout, follow its manual guidance instead of forcing edits.
+- Do not document package internals here; keep the skill focused on adoption in Laravel apps.

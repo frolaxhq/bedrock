@@ -1,0 +1,6 @@
+{
+    "key": "other-key",
+    "name": "Mismatch Module",
+    "version": "1.0.0",
+    "provider": "Frolax\\Bedrock\\Tests\\Fixtures\\Modules\\Other\\ServiceProvider"
+}
