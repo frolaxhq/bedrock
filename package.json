@@ -1,0 +1,19 @@
+{
+    "name": "frolax-bedrock-workspace",
+    "private": true,
+    "packageManager": "pnpm@10.19.0",
+    "scripts": {
+        "frontend:build": "pnpm --filter @frolax/bedrock build",
+        "frontend:check": "pnpm --filter @frolax/bedrock check",
+        "frontend:generate": "pnpm --filter @frolax/bedrock generate",
+        "frontend:generate:check": "pnpm --filter @frolax/bedrock generate:check",
+        "frontend:e2e": "pnpm --filter @frolax/bedrock test:e2e",
+        "frontend:test": "pnpm --filter @frolax/bedrock test",
+        "frontend:pack": "pnpm --filter @frolax/bedrock exec npm pack --dry-run",
+        "workbench:build": "pnpm frontend:build && pnpm --filter @frolax/bedrock-workbench build && pnpm --filter @modules/example build",
+        "workbench:dev": "pnpm frontend:build && concurrently --kill-others --names laravel,host,module --prefix-colors blue,magenta,green \"php vendor/bin/testbench serve --host=127.0.0.1 --port=8000\" \"pnpm --filter @frolax/bedrock-workbench dev\" \"pnpm --filter @modules/example dev --host=127.0.0.1 --port=5180\""
+    },
+    "devDependencies": {
+        "concurrently": "^10.0.5"
+    }
+}

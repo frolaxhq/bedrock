@@ -1,0 +1,121 @@
+{
+    "name": "@frolax/bedrock",
+    "version": "1.0.0",
+    "description": "Typed React, Inertia, and Vite runtime for Frolax Bedrock modules.",
+    "license": "MIT",
+    "type": "module",
+    "files": [
+        "dist",
+        "bin",
+        "catalog.json"
+    ],
+    "exports": {
+        "./react": {
+            "types": "./dist/runtime/react.d.ts",
+            "import": "./dist/runtime/react.js"
+        },
+        "./vite": {
+            "types": "./dist/vite/index.d.ts",
+            "import": "./dist/vite/index.js"
+        },
+        "./module": {
+            "types": "./dist/module/index.d.ts",
+            "import": "./dist/module/index.js"
+        },
+        "./ui": {
+            "types": "./dist/ui/index.d.ts",
+            "import": "./dist/ui/index.js"
+        },
+        "./ui-runtime": {
+            "types": "./dist/ui/runtime.d.ts",
+            "import": "./dist/ui/runtime.js"
+        },
+        "./lib": {
+            "types": "./dist/ui/lib.d.ts",
+            "import": "./dist/ui/lib.js"
+        },
+        "./primitives": {
+            "types": "./dist/ui/primitives.d.ts",
+            "import": "./dist/ui/primitives.js"
+        },
+        "./theme": {
+            "types": "./dist/ui/theme/index.d.ts",
+            "import": "./dist/ui/theme/index.js"
+        },
+        "./theme.css": "./dist/ui/theme/theme.css",
+        "./components/ui/*": {
+            "types": "./dist/ui/index.d.ts",
+            "import": "./dist/ui/index.js"
+        },
+        "./components/*": {
+            "types": "./dist/ui/index.d.ts",
+            "import": "./dist/ui/index.js"
+        },
+        "./layouts/*": {
+            "types": "./dist/ui/index.d.ts",
+            "import": "./dist/ui/index.js"
+        },
+        "./hooks/*": {
+            "types": "./dist/ui/theme/index.d.ts",
+            "import": "./dist/ui/theme/index.js"
+        }
+    },
+    "bin": {
+        "bedrock-artifact": "./bin/bedrock-artifact.mjs"
+    },
+    "scripts": {
+        "generate": "node scripts/generate-frontend.mjs",
+        "generate:check": "node scripts/generate-frontend.mjs --check",
+        "build": "pnpm generate && node scripts/clean-dist.mjs && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/copy-assets.mjs",
+        "check": "pnpm generate && tsc --noEmit",
+        "test": "pnpm generate:check && vitest run",
+        "test:e2e": "pnpm build && node e2e/prepare.mjs && playwright test",
+        "pack": "pnpm pack"
+    },
+    "dependencies": {
+        "@base-ui/react": "^1.8.0",
+        "@module-federation/enhanced": "2.9.2",
+        "@module-federation/vite": "1.23.0",
+        "@tabler/icons-react": "^3.48.0",
+        "class-variance-authority": "^0.7.1",
+        "cn": "^0.4.0",
+        "next-themes": "^0.4.6",
+        "semver": "^7.7.3",
+        "sonner": "^2.0.8",
+        "tw-animate-css": "^1.4.0"
+    },
+    "peerDependencies": {
+        "@inertiajs/core": "^3.0.0",
+        "@inertiajs/react": "^3.0.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tailwindcss": "^4.0.0",
+        "vite": "^8.0.0"
+    },
+    "peerDependenciesMeta": {
+        "tailwindcss": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@inertiajs/core": "3.7.1",
+        "@inertiajs/react": "3.7.1",
+        "@playwright/test": "^1.56.0",
+        "@types/node": "^24.0.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@types/semver": "^7.7.1",
+        "@vitejs/plugin-react": "^6.0.0",
+        "jsdom": "^27.0.0",
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+        "tailwindcss": "4.3.3",
+        "tsc-alias": "^1.8.16",
+        "typescript": "^5.9.0",
+        "vite": "8.3.2",
+        "vitest": "^4.0.0"
+    },
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    }
+}

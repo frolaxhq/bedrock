@@ -1,0 +1,21 @@
+{
+    "$schema": "https://ui.shadcn.com/schema.json",
+    "style": "base-nova",
+    "rsc": false,
+    "tsx": true,
+    "rtl": true,
+    "tailwind": {
+        "config": "",
+        "css": "src/ui/theme/theme.css",
+        "baseColor": "neutral",
+        "cssVariables": true
+    },
+    "iconLibrary": "tabler",
+    "aliases": {
+        "components": "@bedrock/components",
+        "hooks": "@bedrock/hooks",
+        "lib": "@bedrock/lib",
+        "utils": "@bedrock/lib/utils",
+        "ui": "@bedrock/components/ui"
+    }
+}
