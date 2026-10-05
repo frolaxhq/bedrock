@@ -1,0 +1,22 @@
+{
+    "name": "frolaxhq/bedrock-workbench",
+    "description": "Workbench host application for frolaxhq/bedrock",
+    "type": "project",
+    "license": "MIT",
+    "private": true,
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Workbench\\App\\": "app/",
+            "Workbench\\Database\\Factories\\": "database/factories/",
+            "Workbench\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Workbench\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

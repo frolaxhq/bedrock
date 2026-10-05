@@ -1,0 +1,51 @@
+{
+    "schema": 1,
+    "key": "example",
+    "name": "Example Module",
+    "version": "1.0.0",
+    "description": "The canonical Bedrock full-stack reference module.",
+    "provider": "Modules\\Example\\ExampleServiceProvider",
+    "autoload": {
+        "psr-4": {
+            "Modules\\Example\\": "src/"
+        }
+    },
+    "composer": {
+        "require": {
+            "php": "^8.5",
+            "laravel/framework": "^13.0"
+        }
+    },
+    "settings": {
+        "welcome_message": {
+            "type": "text",
+            "label": "Welcome message",
+            "default": "Hello from the Example module",
+            "rules": ["required", "string", "max:120"]
+        },
+        "api_key": {
+            "type": "secret",
+            "label": "Example API key",
+            "default": null,
+            "rules": ["nullable", "string"]
+        }
+    },
+    "permissions": [
+        {
+            "key": "view",
+            "label": "View example",
+            "description": "View the Example module page."
+        }
+    ],
+    "frontend": {
+        "driver": "inertia-react",
+        "pages": "resources/js/pages",
+        "artifact": "dist/bedrock/frontend.json",
+        "requires": {
+            "react": "^19.0",
+            "react-dom": "^19.0",
+            "@inertiajs/react": "^3.0",
+            "@frolax/bedrock": "^1.0"
+        }
+    }
+}

@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@import '@frolax/bedrock/theme.css';
+
+@source '../js';
+@source '../../node_modules/@frolax/bedrock/dist';
+
+:root {
+    --primary: oklch(0.55 0.24 285);
+    --primary-foreground: oklch(0.985 0 0);
+}

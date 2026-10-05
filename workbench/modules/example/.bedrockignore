@@ -1,0 +1,7 @@
+.git
+node_modules
+.DS_Store
+*.log
+dist/bedrock/client/.vite
+dist/bedrock/client/@mf-types*
+dist/bedrock/client/mf-stats.json
