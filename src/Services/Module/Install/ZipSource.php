@@ -247,8 +247,6 @@ class ZipSource implements DisposableModuleSource, ModuleSource
         $this->files->ensureDirectoryExists($incoming);
 
         try {
-            $this->files->ensureDirectoryExists($directory.'/staged');
-
             foreach ($entries as $entry) {
                 if ($entry['directory']) {
                     continue;
