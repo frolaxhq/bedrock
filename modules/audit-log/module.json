@@ -1,0 +1,13 @@
+{
+    "schema": 1,
+    "key": "audit-log",
+    "name": "Audit history",
+    "version": "1.0.0",
+    "description": "Optional records of successful Bedrock operations and explicit application events.",
+    "provider": "Modules\\AuditLog\\AuditLogServiceProvider",
+    "core": "^1.0",
+    "autoload": { "psr-4": { "Modules\\AuditLog\\": "src/" } },
+    "composer": { "require": { "php": "^8.5", "laravel/framework": "^13.0" } },
+    "permissions": [{ "key": "view", "label": "View audit history" }],
+    "database": { "migrations": true }
+}

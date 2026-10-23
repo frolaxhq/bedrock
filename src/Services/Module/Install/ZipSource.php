@@ -247,8 +247,6 @@ class ZipSource implements DisposableModuleSource, ModuleSource
         $this->files->ensureDirectoryExists($incoming);
 
         try {
-            $this->files->ensureDirectoryExists($directory.'/staged');
-
             foreach ($entries as $entry) {
                 if ($entry['directory']) {
                     continue;
@@ -274,14 +272,12 @@ class ZipSource implements DisposableModuleSource, ModuleSource
 
         $staged = $directory.'/staged';
 
-        foreach ($this->files->allFiles($incoming) as $file) {
-            $relative = ltrim(substr($file->getPathname(), strlen($incoming)), '/\\');
+        // Preserve hidden files and empty autoload directories, both covered by hashes.
+        if (! @rename($incoming, $staged)) {
+            $this->files->deleteDirectory($directory);
 
-            $this->files->ensureDirectoryExists($staged.'/'.dirname($relative));
-            $this->files->move($file->getPathname(), $staged.'/'.$relative);
+            throw InvalidModuleArchiveException::extractionFailed($this->path);
         }
-
-        $this->files->deleteDirectory($incoming);
 
         return $directory;
     }

@@ -1,6 +1,6 @@
 import react from '@vitejs/plugin-react';
 import { bedrockHost } from '../../src/vite/index.js';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vite-plus';
 
 export default defineConfig({
     base: '/assets/',

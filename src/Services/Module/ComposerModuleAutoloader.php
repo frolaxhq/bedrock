@@ -8,6 +8,7 @@ use Composer\Autoload\ClassLoader;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 
 class ComposerModuleAutoloader implements ModuleAutoloader
 {
@@ -22,7 +23,30 @@ class ComposerModuleAutoloader implements ModuleAutoloader
             throw new InvalidModuleSourceException($failures[0]);
         }
 
+        $runtime = app(PhpRuntime::class);
+        $original = $path;
+        $loading = $runtime->loading($manifest, $path);
+        $path = $loading['root'];
         $loader = $this->loader();
+
+        if ($path !== $original) {
+            $maps = $loading['maps'];
+            foreach ($maps['psr4'] as $prefix => $paths) {
+                $loader->addPsr4($prefix, $paths);
+            }
+            $loader->addClassMap($maps['classmap']);
+
+            if ($loadFiles) {
+                foreach ($maps['files'] as $file) {
+                    if (! isset($this->loadedFiles[$file])) {
+                        require_once $file;
+                        $this->loadedFiles[$file] = true;
+                    }
+                }
+            }
+
+            return;
+        }
 
         foreach (($manifest->autoload['psr-4'] ?? []) as $prefix => $paths) {
             $paths = is_string($paths) ? [$paths] : $paths;

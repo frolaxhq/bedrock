@@ -30,7 +30,7 @@ it('copies a module from a source into the module root', function () {
 
     expect($registered)->toBeInstanceOf(Module::class)
         ->and($registered?->status)->toBe(ModuleStatus::Installed)
-        ->and($registered?->path)->toBe($root.'/alpha')
+        ->and(str_replace('\\', '/', $registered?->path ?? ''))->toBe(str_replace('\\', '/', $root.'/alpha'))
         ->and(is_file($root.'/alpha/module.json'))->toBeTrue()
         ->and(is_file($root.'/alpha/resources/views/index.blade.php'))->toBeTrue();
 

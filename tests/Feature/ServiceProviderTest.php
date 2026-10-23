@@ -86,7 +86,7 @@ it('merges the capability configuration', function () {
         ->and(config('bedrock.frontend.panels.user_attribute'))->toBe('type')
         ->and(config('bedrock.frontend.panels.fallback'))->toBe('default')
         ->and(config('bedrock.permissions.guard'))->toBe('web')
-        ->and(config('bedrock'))->not->toHaveKey('administration');
+        ->and(config('bedrock.administration.enabled'))->toBeTrue();
 });
 
 it('publishes only the package configuration', function () {

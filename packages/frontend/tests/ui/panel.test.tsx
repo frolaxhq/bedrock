@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import {
     PanelProvider,
     PanelShell,
@@ -31,7 +31,12 @@ function EmptyHeader() {
 }
 
 function CustomShell({ children }: PanelShellProps) {
-    return <section data-custom-shell><PanelSlot name="workspace-switcher" />{children}</section>;
+    return (
+        <section data-custom-shell>
+            <PanelSlot name="workspace-switcher" />
+            {children}
+        </section>
+    );
 }
 
 describe('panel composition', () => {
@@ -43,12 +48,20 @@ describe('panel composition', () => {
 
     it('inherits default slots and replaces only the active panel regions', () => {
         registerFrontendPanels({
-            default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar, 'sidebar-footer': DefaultFooter } },
+            default: {
+                slots: {
+                    header: EmptyHeader,
+                    sidebar: DefaultSidebar,
+                    'sidebar-footer': DefaultFooter,
+                },
+            },
             admin: { slots: { 'sidebar-footer': AdminFooter } },
         });
 
         const html = renderToStaticMarkup(
-            <PanelProvider panel="admin"><PanelShell>Dashboard</PanelShell></PanelProvider>,
+            <PanelProvider panel="admin">
+                <PanelShell>Dashboard</PanelShell>
+            </PanelProvider>,
         );
 
         expect(html).toContain('data-panel="admin"');
@@ -58,13 +71,19 @@ describe('panel composition', () => {
     });
 
     it('falls unknown and invalid panel keys back to the default panel', () => {
-        registerFrontendPanels({ default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar } } });
+        registerFrontendPanels({
+            default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar } },
+        });
 
         const unknown = renderToStaticMarkup(
-            <PanelProvider panel="vendor"><PanelShell>Unknown</PanelShell></PanelProvider>,
+            <PanelProvider panel="vendor">
+                <PanelShell>Unknown</PanelShell>
+            </PanelProvider>,
         );
         const invalid = renderToStaticMarkup(
-            <PanelProvider panel="../admin"><PanelShell>Invalid</PanelShell></PanelProvider>,
+            <PanelProvider panel="../admin">
+                <PanelShell>Invalid</PanelShell>
+            </PanelProvider>,
         );
 
         expect(unknown).toContain('data-panel="default"');
@@ -81,7 +100,9 @@ describe('panel composition', () => {
         });
 
         const html = renderToStaticMarkup(
-            <PanelProvider panel="admin"><PanelShell>Content</PanelShell></PanelProvider>,
+            <PanelProvider panel="admin">
+                <PanelShell>Content</PanelShell>
+            </PanelProvider>,
         );
 
         expect(html).toContain('data-custom-shell');
@@ -90,11 +111,15 @@ describe('panel composition', () => {
     });
 
     it('renders an SSR-stable sidebar state and restores the browser preference after hydration', async () => {
-        registerFrontendPanels({ default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar } } });
+        registerFrontendPanels({
+            default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar } },
+        });
         window.localStorage.setItem('bedrock:panel:default:sidebar-collapsed', 'true');
 
         const server = renderToStaticMarkup(
-            <PanelProvider><PanelShell>Content</PanelShell></PanelProvider>,
+            <PanelProvider>
+                <PanelShell>Content</PanelShell>
+            </PanelProvider>,
         );
 
         expect(server).toContain('data-sidebar-collapsed="false"');
@@ -103,17 +128,26 @@ describe('panel composition', () => {
         const root = createRoot(container);
 
         await act(async () => {
-            root.render(<PanelProvider><PanelShell>Content</PanelShell></PanelProvider>);
+            root.render(
+                <PanelProvider>
+                    <PanelShell>Content</PanelShell>
+                </PanelProvider>,
+            );
         });
 
-        expect(container.querySelector('[data-slot="panel-shell"]')?.getAttribute('data-sidebar-collapsed'))
-            .toBe('true');
+        expect(
+            container
+                .querySelector('[data-slot="panel-shell"]')
+                ?.getAttribute('data-sidebar-collapsed'),
+        ).toBe('true');
 
         await act(async () => root.unmount());
     });
 
     it('exposes an accessible trigger that controls desktop panel state', async () => {
-        registerFrontendPanels({ default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar } } });
+        registerFrontendPanels({
+            default: { slots: { header: EmptyHeader, sidebar: DefaultSidebar } },
+        });
         const container = document.createElement('div');
         const root = createRoot(container);
 
@@ -132,8 +166,11 @@ describe('panel composition', () => {
 
         await act(async () => trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
-        expect(container.querySelector('[data-slot="panel-shell"]')?.getAttribute('data-sidebar-collapsed'))
-            .toBe('true');
+        expect(
+            container
+                .querySelector('[data-slot="panel-shell"]')
+                ?.getAttribute('data-sidebar-collapsed'),
+        ).toBe('true');
         expect(trigger?.getAttribute('aria-label')).toBe('Expand navigation');
         expect(window.localStorage.getItem('bedrock:panel:default:sidebar-collapsed')).toBe('true');
 

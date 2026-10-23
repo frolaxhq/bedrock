@@ -1,18 +1,12 @@
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import { bedrockHost } from '@frolax/bedrock/vite';
+import { defineHostConfig } from '@frolax/bedrock/vite';
 import laravel from 'laravel-vite-plugin';
-import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineHostConfig({
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             ssr: 'resources/js/ssr.tsx',
             refresh: true,
         }),
-        react(),
-        tailwindcss(),
-        bedrockHost(),
     ],
 });

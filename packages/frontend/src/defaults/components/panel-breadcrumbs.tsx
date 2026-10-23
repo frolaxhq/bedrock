@@ -22,17 +22,18 @@ export interface PanelBreadcrumbsProps extends React.ComponentProps<'nav'> {
  * navigation: every active item from the group root down to the current page.
  * When no navigation item matches, the current URL segments are shown.
  */
-export function PanelBreadcrumbs({ className, homeLabel = 'Home', url = '/', ...props }: PanelBreadcrumbsProps) {
+export function PanelBreadcrumbs({
+    className,
+    homeLabel = 'Home',
+    url = '/',
+    ...props
+}: PanelBreadcrumbsProps) {
     const navigation = useNavigation();
     const trail = activeTrail(navigation.items);
     const segments = trail.length === 0 ? segmentsFromUrl(url) : [];
 
     return (
-        <Breadcrumb
-            aria-label="Breadcrumb"
-            className={cn('min-w-0 text-sm', className)}
-            {...props}
-        >
+        <Breadcrumb aria-label="Breadcrumb" className={cn('min-w-0 text-sm', className)} {...props}>
             <BreadcrumbList>
                 <BreadcrumbItem>
                     {trail.length === 0 && segments.length === 0 ? (
@@ -48,7 +49,9 @@ export function PanelBreadcrumbs({ className, homeLabel = 'Home', url = '/', ...
                             {index === trail.length - 1 || !item.href ? (
                                 <BreadcrumbPage>{item.label}</BreadcrumbPage>
                             ) : (
-                                <BreadcrumbLink render={<Link href={item.href} />}>{item.label}</BreadcrumbLink>
+                                <BreadcrumbLink render={<Link href={item.href} />}>
+                                    {item.label}
+                                </BreadcrumbLink>
                             )}
                         </BreadcrumbItem>
                     </React.Fragment>
@@ -60,7 +63,9 @@ export function PanelBreadcrumbs({ className, homeLabel = 'Home', url = '/', ...
                             {index === segments.length - 1 ? (
                                 <BreadcrumbPage>{segment.label}</BreadcrumbPage>
                             ) : (
-                                <BreadcrumbLink render={<Link href={segment.href} />}>{segment.label}</BreadcrumbLink>
+                                <BreadcrumbLink render={<Link href={segment.href} />}>
+                                    {segment.label}
+                                </BreadcrumbLink>
                             )}
                         </BreadcrumbItem>
                     </React.Fragment>

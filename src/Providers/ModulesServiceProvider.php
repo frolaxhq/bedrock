@@ -14,14 +14,15 @@ use Frolax\Bedrock\Console\Commands\Module\ModuleInstallCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleListCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleMakeCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModulePackCommand;
+use Frolax\Bedrock\Console\Commands\Module\ModulePrepareCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleSyncCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleUninstallCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleValidateCommand;
-use Frolax\Bedrock\Contracts\Frontend\FrontendAssetManager;
 use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\Contracts\Module\ModuleDiagnostics;
 use Frolax\Bedrock\Contracts\Module\ModuleDiscoverer;
+use Frolax\Bedrock\Contracts\Module\ModuleFrontendScaffold;
 use Frolax\Bedrock\Contracts\Module\ModuleManager;
 use Frolax\Bedrock\Contracts\Module\ModuleOperationLock;
 use Frolax\Bedrock\Contracts\Module\ModuleRegistry;
@@ -43,8 +44,10 @@ use Frolax\Bedrock\Services\Module\Install\ModulePackageValidator;
 use Frolax\Bedrock\Services\Module\InstalledComposerRequirementChecker;
 use Frolax\Bedrock\Services\Module\ModuleBootstrapper;
 use Frolax\Bedrock\Services\Module\ModuleDoctor;
+use Frolax\Bedrock\Services\Module\ModuleFeatureHandlers;
 use Frolax\Bedrock\Services\Module\ModuleHealthManager;
 use Frolax\Bedrock\Services\Module\ModuleManager as ModuleManagerImplementation;
+use Frolax\Bedrock\Services\Module\Operations\InstallationOperations;
 use Frolax\Bedrock\Services\Module\RegisteredReverseDependencyResolver;
 use Frolax\Bedrock\Services\Module\VersionConstraint;
 use Frolax\Bedrock\Support\Module\ModuleManifest;
@@ -74,6 +77,7 @@ class ModulesServiceProvider extends ServiceProvider
         ModuleListCommand::class,
         ModuleMakeCommand::class,
         ModulePackCommand::class,
+        ModulePrepareCommand::class,
         ModuleSyncCommand::class,
         ModuleUninstallCommand::class,
         ModuleValidateCommand::class,
@@ -93,6 +97,8 @@ class ModulesServiceProvider extends ServiceProvider
         $this->app->singleton(ReverseDependencyResolver::class, RegisteredReverseDependencyResolver::class);
         $this->app->singleton(ModuleDiagnostics::class, ModuleDoctor::class);
         $this->app->singleton(ModuleHealthManager::class);
+        $this->app->singleton(ModuleFeatureHandlers::class);
+        $this->app->singleton(InstallationOperations::class);
 
         $this->app->singleton(ModuleOperationLock::class, function (Application $app): CacheModuleOperationLock {
             return new CacheModuleOperationLock(
@@ -136,7 +142,8 @@ class ModulesServiceProvider extends ServiceProvider
         });
 
         $this->app->bind(ModuleScaffolder::class, function (Application $app): ModuleScaffolder {
-            return new ModuleScaffolder($app->make('files'), ModulePath::modules($app));
+            return new ModuleScaffolder($app->make('files'), ModulePath::modules($app),
+                $app->bound(ModuleFrontendScaffold::class) ? $app->make(ModuleFrontendScaffold::class) : null);
         });
 
         $this->app->bind(ModuleSourceValidator::class, function (Application $app): ModuleSourceValidator {
@@ -144,7 +151,7 @@ class ModulesServiceProvider extends ServiceProvider
                 $app->make(ModulePackageValidator::class),
                 $app->make(ModuleManifest::class),
                 $app->make(ModuleAutoloader::class),
-                $app->make(FrontendAssetManager::class),
+                $app->make(ModuleFeatureHandlers::class),
                 ModulePath::manifest($app),
             );
         });

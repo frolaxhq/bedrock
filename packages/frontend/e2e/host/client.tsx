@@ -1,3 +1,4 @@
+/// <reference path="../../src/runtime/virtual.d.ts" />
 import { createInertiaApp, Head, Link } from '@inertiajs/react';
 import { AppLayout } from '@frolax/bedrock/ui';
 import { ThemeProvider } from '@frolax/bedrock/theme';
@@ -29,7 +30,7 @@ const resolve = createBedrockResolver({
     versions: {
         react: '19.3.0',
         'react-dom': '19.3.0',
-        '@inertiajs/react': '3.7.1',
+        '@inertiajs/react': '3.8.0',
         '@frolax/bedrock': '1.0.0',
     },
 });

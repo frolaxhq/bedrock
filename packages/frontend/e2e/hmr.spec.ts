@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react';
 import { expect, test } from '@playwright/test';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createServer, type ViteDevServer } from 'vite';
+import { createServer, type ViteDevServer } from 'vite-plus';
 import { bedrockHost } from '../src/vite/index.js';
 
 const packageRoot = path.resolve(import.meta.dirname, '..');
@@ -39,7 +39,10 @@ test.beforeAll(async () => {
         }),
     );
     await writeFile(panelSlot, panelSource('First panel version'));
-    await writeFile(panelHeader, 'export default function Header() { return <header>Header</header>; }\n');
+    await writeFile(
+        panelHeader,
+        'export default function Header() { return <header>Header</header>; }\n',
+    );
     await writeFile(navigation, navigationSource('First navigation version'));
     await writeFile(
         path.join(fixtureRoot, 'src/main.tsx'),
@@ -88,8 +91,13 @@ test.afterAll(async () => {
 });
 
 test('panel and navigation edits update without reloading the host', async ({ page }) => {
+    page.on('pageerror', (error) => console.error(`HMR page error: ${error.message}`));
+    page.on('console', (message) => {
+        if (message.type() === 'error') console.error(`HMR console error: ${message.text()}`);
+    });
+
     await page.goto('http://127.0.0.1:4191');
-    await expect(page.getByText('First panel version')).toBeVisible();
+    await expect(page.getByText('First panel version')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('[data-navigation]')).toHaveText('First navigation version');
     await expect(page.locator('body')).toHaveAttribute('data-loads', '1');
 

@@ -13,10 +13,13 @@ use Frolax\Bedrock\Facades\Frontend as FrontendFacade;
 use Frolax\Bedrock\Frontend;
 use Frolax\Bedrock\Navigation;
 use Frolax\Bedrock\Providers\FrontendServiceProvider;
+use Frolax\Bedrock\Services\Frontend\ViewerContextFactory;
 use Frolax\Bedrock\Services\Module\Install\LocalDirectorySource;
 use Frolax\Bedrock\Support\Module\ModuleManifest;
 use Frolax\Bedrock\Testing\Module\ModuleManifestFactory;
+use Illuminate\Foundation\Auth\User as BaseUser;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Workbench\App\Models\User;
@@ -125,6 +128,30 @@ it('shares a safe panel key for the authenticated viewer', function () {
     config()->set('bedrock.frontend.panels.fallback', '../unsafe');
 
     expect(is_callable($shared) ? $shared()['viewer'] : null)->toMatchArray(['panel' => 'default']);
+});
+
+it('shares active permissions granted by the host gate without requiring Spatie on the user', function (): void {
+    $this->seedModule('portal', [
+        'manifest' => [
+            'key' => 'portal',
+            'name' => 'Portal',
+            'version' => '1.0.0',
+            'provider' => 'Modules\\Portal\\PortalServiceProvider',
+            'permissions' => ['view'],
+        ],
+    ]);
+    $permissions = app(ModulePermissions::class);
+    $permissions->sync('portal');
+    Gate::define('portal.view', static fn (): bool => true);
+
+    $viewer = app(ViewerContextFactory::class);
+    $user = (new BaseUser)->forceFill(['id' => 'viewer-uuid', 'name' => 'Viewer']);
+
+    expect($viewer->make($user)['permissions'])->toBe(['portal.view']);
+
+    $permissions->deactivate('portal');
+
+    expect($viewer->make($user)['permissions'])->toBe([]);
 });
 
 it('rejects module navigation permissions that escape the module namespace', function () {

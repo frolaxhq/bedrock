@@ -326,7 +326,7 @@ it('refreshes a stale provider snapshot from the manifest', function () {
     expect(app(ModuleRepository::class)->find('alpha')?->health)->toBe(ModuleHealth::Healthy)
         ->and(app(ModuleRepository::class)->find('alpha')?->name)->toBe('Alpha Module')
         ->and(app(ModuleRepository::class)->find('alpha')?->provider)->toBe(AlphaServiceProvider::class)
-        ->and(app(ModuleRepository::class)->find('alpha')?->path)->toBe($this->fixturePath('alpha'))
+        ->and(str_replace('\\', '/', app(ModuleRepository::class)->find('alpha')?->path ?? ''))->toBe(str_replace('\\', '/', $this->fixturePath('alpha')))
         ->and(app(ModuleRepository::class)->find('alpha')?->dependencies)->toBe([]);
 });
 

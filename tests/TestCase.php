@@ -20,6 +20,9 @@ use Frolax\Bedrock\Models\Module;
 use Frolax\Bedrock\Module as ModuleGateway;
 use Frolax\Bedrock\Navigation;
 use Frolax\Bedrock\Permissions;
+use Frolax\Bedrock\Providers\AdministrationServiceProvider;
+use Frolax\Bedrock\Providers\FrontendServiceProvider;
+use Frolax\Bedrock\Providers\SpatieAccessServiceProvider;
 use Frolax\Bedrock\Repositories\Module\ArrayModuleRepository;
 use Frolax\Bedrock\Settings;
 use Frolax\Bedrock\Support\Module\ModuleManifest;
@@ -46,6 +49,9 @@ abstract class TestCase extends Orchestra
             BedrockServiceProvider::class,
             LaravelDataServiceProvider::class,
             PermissionServiceProvider::class,
+            SpatieAccessServiceProvider::class,
+            FrontendServiceProvider::class,
+            AdministrationServiceProvider::class,
         ];
     }
 
@@ -63,6 +69,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('permission', require dirname(__DIR__).'/vendor/spatie/laravel-permission/config/permission.php');
         $app['config']->set('permission.testing', true);
+        $app['config']->set('bedrock.administration.enabled', true);
     }
 
     /**

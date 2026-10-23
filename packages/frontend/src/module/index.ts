@@ -1,7 +1,10 @@
 import type { ComponentType } from 'react';
 
 export type ModulePageImport = () => Promise<{ default: ComponentType<Record<string, unknown>> }>;
-export type NavigationIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false' }>;
+export type NavigationIcon = ComponentType<{
+    className?: string;
+    'aria-hidden'?: boolean | 'true' | 'false';
+}>;
 export type NavigationSide = 'host' | 'module';
 
 export interface NavigationViewer {
@@ -63,7 +66,9 @@ interface NavigationBaseDefinition {
     order?: number;
     parent?: string;
     children?: NavigationLinkDefinition[];
-    resolve?: (context: NavigationContext) => NavigationPresentation | Promise<NavigationPresentation>;
+    resolve?: (
+        context: NavigationContext,
+    ) => NavigationPresentation | Promise<NavigationPresentation>;
 }
 
 export interface NavigationLinkDefinition extends NavigationBaseDefinition {
@@ -87,7 +92,10 @@ export interface NavigationDefinitionValue {
 export type NavigationDefinitionSource =
     | NavigationDefinitionValue
     | NavigationItemDefinition[]
-    | (() => NavigationDefinitionValue | NavigationItemDefinition[] | Promise<NavigationDefinitionValue | NavigationItemDefinition[]>);
+    | (() =>
+          | NavigationDefinitionValue
+          | NavigationItemDefinition[]
+          | Promise<NavigationDefinitionValue | NavigationItemDefinition[]>);
 
 export interface NavigationDefinition {
     readonly source: NavigationDefinitionSource;
@@ -119,7 +127,10 @@ export interface NavigationDescriptor {
     items: NavigationDescriptorItem[];
 }
 
-export interface ResolvedNavigationItem extends Omit<NavigationDescriptorItem, 'active' | 'children'> {
+export interface ResolvedNavigationItem extends Omit<
+    NavigationDescriptorItem,
+    'active' | 'children'
+> {
     module?: string;
     icon?: NavigationIcon;
     badge?: string | number | null;
@@ -144,11 +155,15 @@ export function defineNavigation(source: NavigationDefinitionSource): Navigation
     return { source };
 }
 
-export function navigationItem(definition: Omit<NavigationLinkDefinition, 'kind'>): NavigationLinkDefinition {
+export function navigationItem(
+    definition: Omit<NavigationLinkDefinition, 'kind'>,
+): NavigationLinkDefinition {
     return { ...definition, kind: 'link' };
 }
 
-export function navigationAction(definition: Omit<NavigationActionDefinition, 'kind'>): NavigationActionDefinition {
+export function navigationAction(
+    definition: Omit<NavigationActionDefinition, 'kind'>,
+): NavigationActionDefinition {
     return { ...definition, kind: 'action' };
 }
 
@@ -173,7 +188,10 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
             validate(value);
 
             return {
-                groups: (value.groups ?? []).map((group) => ({ ...group, order: group.order ?? 0 })),
+                groups: (value.groups ?? []).map((group) => ({
+                    ...group,
+                    order: group.order ?? 0,
+                })),
                 items: value.items.map((item) => describeItem(item)),
             };
         },
@@ -188,14 +206,20 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
             validate(value);
 
             return {
-                groups: (value.groups ?? []).map((group) => ({ ...group, order: group.order ?? 0 })),
+                groups: (value.groups ?? []).map((group) => ({
+                    ...group,
+                    order: group.order ?? 0,
+                })),
                 items: await Promise.all(value.items.map((item) => resolveItem(item, context))),
             };
         },
 
         async runNavigationAction(key: string, context: NavigationContext): Promise<void> {
             const value = await materialize(navigation);
-            const action = flatten(value.items).find((item): item is NavigationActionDefinition => item.key === key && item.kind === 'action');
+            const action = flatten(value.items).find(
+                (item): item is NavigationActionDefinition =>
+                    item.key === key && item.kind === 'action',
+            );
 
             if (!action) {
                 throw new Error(`Navigation action [${key}] was not found.`);
@@ -207,7 +231,8 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
 }
 
 async function materialize(definition: NavigationDefinition): Promise<NavigationDefinitionValue> {
-    const source = typeof definition.source === 'function' ? await definition.source() : definition.source;
+    const source =
+        typeof definition.source === 'function' ? await definition.source() : definition.source;
 
     return Array.isArray(source) ? { items: source } : source;
 }
@@ -217,7 +242,9 @@ async function materialize(definition: NavigationDefinition): Promise<Navigation
  * dynamic resolvers. Used to rebind icons and actions on the client from an
  * SSR resolution snapshot.
  */
-export async function materializeNavigation(definition: NavigationDefinition): Promise<NavigationDefinitionValue> {
+export async function materializeNavigation(
+    definition: NavigationDefinition,
+): Promise<NavigationDefinitionValue> {
     const value = await materialize(definition);
 
     validate(value);
@@ -225,7 +252,10 @@ export async function materializeNavigation(definition: NavigationDefinition): P
     return value;
 }
 
-function describeItem(item: NavigationItemDefinition, parent?: NavigationItemDefinition): NavigationDescriptorItem {
+function describeItem(
+    item: NavigationItemDefinition,
+    parent?: NavigationItemDefinition,
+): NavigationDescriptorItem {
     const effective = parent && item.kind === 'link' ? inheritChild(item, parent) : item;
 
     return {
@@ -244,28 +274,41 @@ function describeItem(item: NavigationItemDefinition, parent?: NavigationItemDef
     };
 }
 
-async function resolveItem(item: NavigationItemDefinition, context: NavigationContext): Promise<ResolvedNavigationItem> {
+async function resolveItem(
+    item: NavigationItemDefinition,
+    context: NavigationContext,
+): Promise<ResolvedNavigationItem> {
     const presentation = item.resolve ? await item.resolve(context) : {};
-    const childPresentations = new Map((presentation.children ?? []).map((child) => [child.key, child]));
-    const children = await Promise.all((item.children ?? []).map(async (child) => {
-        const resolved = await resolveItem(inheritChild(child, item), context);
-        const patch = childPresentations.get(child.key);
+    const childPresentations = new Map(
+        (presentation.children ?? []).map((child) => [child.key, child]),
+    );
+    const children = await Promise.all(
+        (item.children ?? []).map(async (child) => {
+            const resolved = await resolveItem(inheritChild(child, item), context);
+            const patch = childPresentations.get(child.key);
 
-        return patch ? mergePresentation(resolved, patch) : resolved;
-    }));
+            return patch ? mergePresentation(resolved, patch) : resolved;
+        }),
+    );
 
-    return mergePresentation({
-        ...describeItem(item),
-        icon: item.icon,
-        active: isActiveUrl(item.active, context.page.url),
-        visible: true,
-        disabled: false,
-        loading: false,
-        children,
-    }, presentation);
+    return mergePresentation(
+        {
+            ...describeItem(item),
+            icon: item.icon,
+            active: isActiveUrl(item.active, context.page.url),
+            visible: true,
+            disabled: false,
+            loading: false,
+            children,
+        },
+        presentation,
+    );
 }
 
-function mergePresentation(item: ResolvedNavigationItem, patch: NavigationPresentation): ResolvedNavigationItem {
+function mergePresentation(
+    item: ResolvedNavigationItem,
+    patch: NavigationPresentation,
+): ResolvedNavigationItem {
     return {
         ...item,
         ...(patch.label !== undefined ? { label: patch.label } : {}),
@@ -276,7 +319,10 @@ function mergePresentation(item: ResolvedNavigationItem, patch: NavigationPresen
     };
 }
 
-function inheritChild(child: NavigationLinkDefinition, parent: NavigationItemDefinition): NavigationLinkDefinition {
+function inheritChild(
+    child: NavigationLinkDefinition,
+    parent: NavigationItemDefinition,
+): NavigationLinkDefinition {
     return {
         ...child,
         group: child.group ?? parent.group,
@@ -296,7 +342,8 @@ function validate(value: NavigationDefinitionValue): void {
 
     for (const group of value.groups ?? []) {
         assertKey(group.key, 'group');
-        if (!group.label.trim()) throw new Error(`Navigation group [${group.key}] must have a label.`);
+        if (!group.label.trim())
+            throw new Error(`Navigation group [${group.key}] must have a label.`);
         if (groups.has(group.key)) throw new Error(`Duplicate navigation group [${group.key}].`);
         groups.add(group.key);
     }
@@ -311,16 +358,19 @@ function validate(value: NavigationDefinitionValue): void {
             throw new Error(`Navigation link [${item.key}] must define exactly one route or href.`);
         }
 
-        if (item.group && !groups.has(item.group)) throw new Error(`Navigation item [${item.key}] uses unknown group [${item.group}].`);
+        if (item.group && !groups.has(item.group))
+            throw new Error(`Navigation item [${item.key}] uses unknown group [${item.group}].`);
         for (const panel of item.panels ?? []) assertKey(panel, 'panel');
-        if (nested && (item.children?.length ?? 0) > 0) throw new Error(`Navigation item [${item.key}] exceeds one level of nesting.`);
+        if (nested && (item.children?.length ?? 0) > 0)
+            throw new Error(`Navigation item [${item.key}] exceeds one level of nesting.`);
         item.children?.forEach((child) => visit(child, true));
     };
 
     value.items.forEach((item) => visit(item));
 
     for (const item of value.items) {
-        if (item.parent && !items.has(item.parent)) throw new Error(`Navigation item [${item.key}] has unknown parent [${item.parent}].`);
+        if (item.parent && !items.has(item.parent))
+            throw new Error(`Navigation item [${item.key}] has unknown parent [${item.parent}].`);
     }
 }
 

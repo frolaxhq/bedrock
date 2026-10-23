@@ -1,0 +1,146 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to release, for example 1.0.0
+        required: true
+        type: string
+      dry_run:
+        description: Validate and build only; do not tag, publish, or push split packages
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          extensions: dom, curl, libxml, mbstring, zip, fileinfo, sqlite, pdo_sqlite, bcmath, intl
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.6 --activate
+
+      - name: Validate release metadata
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          php scripts/release-verify.php "$VERSION"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Validate PHP package
+        run: |
+          composer install --working-dir=resources/module-tools --no-dev --no-scripts --no-plugins --prefer-dist --no-interaction
+          composer test
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate frontend package
+        run: |
+          pnpm frontend:generate:check
+          pnpm frontend:build
+          pnpm exec vp check
+          pnpm frontend:test
+          pnpm --filter @frolax/bedrock exec npm pack
+
+      - name: Upload frontend package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: frontend-package
+          path: packages/frontend/*.tgz
+          if-no-files-found: error
+
+  publish:
+    needs: prepare
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-latest
+    environment: releases
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.6 --activate
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend package
+        run: pnpm frontend:build
+
+      - name: Publish split Composer packages
+        env:
+          RELEASE_TOKEN: ${{ secrets.FROLAXHQ_RELEASE_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          test -n "$RELEASE_TOKEN"
+          for package in access-spatie admin frontend; do
+            commit=$(git subtree split --prefix="packages/php/$package")
+            remote="https://x-access-token:${RELEASE_TOKEN}@github.com/frolaxhq/bedrock-${package}.git"
+            git push "$remote" "$commit:refs/heads/main" "$commit:refs/tags/$TAG"
+          done
+
+      - name: Tag core package
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag -a "$TAG" -m "Bedrock $TAG"
+          git push origin "$TAG"
+
+      - name: Publish npm package with provenance
+        run: pnpm --filter @frolax/bedrock publish --access public --provenance --no-git-checks
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release create "$TAG" --generate-notes --title "Bedrock $TAG"

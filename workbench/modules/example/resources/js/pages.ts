@@ -8,7 +8,9 @@ import {
 import type { ComponentType } from 'react';
 
 const frontend = defineBedrockModule({
-    pages: import.meta.glob<{ default: ComponentType<Record<string, unknown>> }>('./pages/**/*.tsx'),
+    pages: import.meta.glob<{ default: ComponentType<Record<string, unknown>> }>(
+        './pages/**/*.tsx',
+    ),
     navigation: defineNavigation({
         groups: [{ key: 'examples', label: 'Examples', order: 100 }],
         items: [
@@ -48,14 +50,24 @@ const frontend = defineBedrockModule({
     }),
 });
 
-export const { resolvePage, describeNavigation, materializeNavigation, resolveNavigation, runNavigationAction } = frontend;
+export const {
+    resolvePage,
+    describeNavigation,
+    materializeNavigation,
+    resolveNavigation,
+    runNavigationAction,
+} = frontend;
 
 function cancellableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(resolve, milliseconds);
-        signal.addEventListener('abort', () => {
-            clearTimeout(timer);
-            reject(signal.reason);
-        }, { once: true });
+        signal.addEventListener(
+            'abort',
+            () => {
+                clearTimeout(timer);
+                reject(signal.reason);
+            },
+            { once: true },
+        );
     });
 }

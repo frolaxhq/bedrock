@@ -4,7 +4,7 @@
         "declaration": true,
         "outDir": "dist",
         "rootDir": "src",
-        "types": ["node", "vite/client"]
+        "types": ["node", "vite-plus/client"]
     },
     "include": ["src/**/*.ts", "src/**/*.tsx"],
     "exclude": ["tests"]

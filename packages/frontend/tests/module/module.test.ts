@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import {
     defineBedrockModule,
     defineNavigation,
@@ -37,7 +37,13 @@ describe('defineBedrockModule', () => {
                         panels: ['admin'],
                         active: ['billing.*'],
                         resolve,
-                        children: [navigationItem({ key: 'invoices', label: 'Invoices', route: 'billing.invoices' })],
+                        children: [
+                            navigationItem({
+                                key: 'invoices',
+                                label: 'Invoices',
+                                route: 'billing.invoices',
+                            }),
+                        ],
                     }),
                     navigationAction({ key: 'sync', label: 'Sync', run }),
                 ],
@@ -48,10 +54,20 @@ describe('defineBedrockModule', () => {
             groups: [{ key: 'commerce', label: 'Commerce', order: 20 }],
             items: [
                 expect.objectContaining({
-                    key: 'billing', kind: 'link', route: 'billing.index', permission: 'view', panels: ['admin'],
-                    children: [expect.objectContaining({
-                        key: 'invoices', parent: 'billing', permission: 'view', panels: ['admin'], group: 'commerce',
-                    })],
+                    key: 'billing',
+                    kind: 'link',
+                    route: 'billing.index',
+                    permission: 'view',
+                    panels: ['admin'],
+                    children: [
+                        expect.objectContaining({
+                            key: 'invoices',
+                            parent: 'billing',
+                            permission: 'view',
+                            panels: ['admin'],
+                            group: 'commerce',
+                        }),
+                    ],
                 }),
                 expect.objectContaining({ key: 'sync', kind: 'action' }),
             ],
@@ -67,8 +83,12 @@ describe('defineBedrockModule', () => {
             navigation: defineNavigation(async () => ({
                 items: [
                     navigationItem({
-                        key: 'billing', label: 'Billing', href: '/billing',
-                        async resolve() { return { badge: 4, visible: true }; },
+                        key: 'billing',
+                        label: 'Billing',
+                        href: '/billing',
+                        async resolve() {
+                            return { badge: 4, visible: true };
+                        },
                     }),
                     navigationAction({ key: 'sync', label: 'Sync', run }),
                 ],

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Services\Module;
 
-use Frolax\Bedrock\Contracts\Frontend\FrontendAssetManager;
 use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\Contracts\Module\ModuleRepository;
@@ -30,7 +29,7 @@ class StateReconciler
         protected ModuleAutoloader $autoloader,
         protected ModuleHealthManager $health,
         protected Filesystem $files,
-        protected FrontendAssetManager $frontend,
+        protected ModuleFeatureHandlers $frontend,
     ) {}
 
     /** @return array<string, string> */

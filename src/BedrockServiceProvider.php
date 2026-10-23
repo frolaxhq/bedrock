@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock;
 
-use Frolax\Bedrock\Providers\AdministrationServiceProvider;
 use Frolax\Bedrock\Providers\CoreServiceProvider;
-use Frolax\Bedrock\Providers\FrontendServiceProvider;
 use Frolax\Bedrock\Providers\ModulesServiceProvider;
-use Frolax\Bedrock\Providers\NavigationServiceProvider;
 use Frolax\Bedrock\Providers\PermissionsServiceProvider;
 use Frolax\Bedrock\Providers\SettingsServiceProvider;
 use Illuminate\Support\ServiceProvider;
@@ -31,9 +28,6 @@ class BedrockServiceProvider extends ServiceProvider
         ModulesServiceProvider::class,
         SettingsServiceProvider::class,
         PermissionsServiceProvider::class,
-        FrontendServiceProvider::class,
-        NavigationServiceProvider::class,
-        AdministrationServiceProvider::class,
     ];
 
     /**

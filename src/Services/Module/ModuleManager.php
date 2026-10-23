@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Frolax\Bedrock\Services\Module;
 
 use Closure;
-use Frolax\Bedrock\Contracts\Frontend\FrontendAssetManager;
-use Frolax\Bedrock\Contracts\Frontend\FrontendRegistry;
 use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\Contracts\Module\ModuleDiscoverer;
@@ -16,7 +14,6 @@ use Frolax\Bedrock\Contracts\Module\ModuleRegistry;
 use Frolax\Bedrock\Contracts\Module\ModuleRepository;
 use Frolax\Bedrock\Contracts\Module\ModuleSource;
 use Frolax\Bedrock\Contracts\Module\ReverseDependencyResolver;
-use Frolax\Bedrock\Contracts\Navigation\ModuleNavigation;
 use Frolax\Bedrock\Contracts\Permissions\ModulePermissions;
 use Frolax\Bedrock\DataObjects\Module\DiscoveredModule;
 use Frolax\Bedrock\DataObjects\Module\Manifest;
@@ -29,6 +26,7 @@ use Frolax\Bedrock\Events\Module\ModuleDisabled;
 use Frolax\Bedrock\Events\Module\ModuleDiscovered;
 use Frolax\Bedrock\Events\Module\ModuleEnabled;
 use Frolax\Bedrock\Events\Module\ModuleInstalled;
+use Frolax\Bedrock\Events\Module\ModuleRegistryChanged;
 use Frolax\Bedrock\Events\Module\ModuleUninstalled;
 use Frolax\Bedrock\Exceptions\Frontend\InvalidFrontendArtifactException;
 use Frolax\Bedrock\Exceptions\Module\CircularDependencyException;
@@ -40,6 +38,8 @@ use Frolax\Bedrock\Exceptions\Module\ModuleNotFoundException;
 use Frolax\Bedrock\Models\Module;
 use Frolax\Bedrock\Services\Module\Install\DatabaseModuleRunner;
 use Frolax\Bedrock\Services\Module\Install\ModuleInstaller;
+use Frolax\Bedrock\Services\Module\Operations\InstallationOperations;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 use Frolax\Bedrock\Support\Module\ModulePath;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
@@ -64,10 +64,8 @@ class ModuleManager implements ModuleManagerContract
         protected ModuleInstaller $installer,
         protected DatabaseModuleRunner $database,
         protected Filesystem $files,
-        protected FrontendAssetManager $frontendAssets,
-        protected FrontendRegistry $frontendRegistry,
+        protected ModuleFeatureHandlers $features,
         protected ModulePermissions $permissions,
-        protected ModuleNavigation $navigation,
     ) {}
 
     public function sync(): ModuleDiscoveryResult
@@ -84,9 +82,8 @@ class ModuleManager implements ModuleManagerContract
 
             $this->reconciler->reconcile($discovery);
             $this->registry->refresh();
-            $this->frontendRegistry->refresh();
             $this->permissions->sync();
-            $this->navigation->refresh();
+            event(new ModuleRegistryChanged);
 
             return $discovery;
         });
@@ -142,17 +139,19 @@ class ModuleManager implements ModuleManagerContract
 
     public function installFrom(ModuleSource $source, string $key): bool
     {
-        $module = $this->installer->install($source, $key);
+        return $this->withLocks(['__source.'.$key], function () use ($source, $key): bool {
+            $module = $this->installer->install($source, $key);
 
-        try {
-            return $this->install($key);
-        } catch (Throwable $exception) {
-            if ($this->repository->find($key) === null) {
-                $this->register($module);
+            try {
+                return $this->install($key);
+            } catch (Throwable $exception) {
+                if ($this->repository->find($key) === null) {
+                    $this->register($module);
+                }
+
+                throw $exception;
             }
-
-            throw $exception;
-        }
+        }, $key);
     }
 
     public function uninstall(string $key): bool
@@ -179,7 +178,7 @@ class ModuleManager implements ModuleManagerContract
             }
 
             try {
-                $this->frontendAssets->remove($key, (string) $module->version);
+                $this->features->remove($manifest);
 
                 if (! $this->files->deleteDirectory($quarantine)) {
                     throw new InvalidModuleSourceException(sprintf('The quarantined module directory [%s] could not be removed.', $quarantine));
@@ -187,9 +186,7 @@ class ModuleManager implements ModuleManagerContract
 
                 $this->repository->delete($key);
                 $this->registry->refresh();
-                $this->frontendRegistry->refresh();
                 $this->permissions->deactivate($key);
-                $this->navigation->refresh();
             } catch (Throwable $exception) {
                 if ($this->files->isDirectory($quarantine)) {
                     @rename($quarantine, $path);
@@ -226,7 +223,7 @@ class ModuleManager implements ModuleManagerContract
             $this->composer->ensureSatisfied($manifest);
             $this->autoloader->register($manifest, (string) $module->path, true);
             $this->guard->ensureSatisfied($manifest);
-            $this->frontendAssets->ensureValid($manifest, (string) $module->path, true);
+            $this->features->ensureValid($manifest, (string) $module->path, true);
 
             $this->repository->upsert($key, [
                 'status' => ModuleStatus::Enabled,
@@ -234,8 +231,6 @@ class ModuleManager implements ModuleManagerContract
                 'disabled_at' => null,
             ]);
             $this->registry->refresh();
-            $this->frontendRegistry->refresh();
-            $this->navigation->refresh();
             event(new ModuleEnabled($key, $manifest));
 
             return true;
@@ -304,6 +299,7 @@ class ModuleManager implements ModuleManagerContract
         try {
             $this->core->ensureSatisfied($module->manifest);
             $this->composer->ensureSatisfied($module->manifest);
+            $this->app->make(PhpRuntime::class)->prepare($module->manifest, $module->path, (bool) config('bedrock.modules.php.offline', false));
             $this->autoloader->register($module->manifest, $module->path, true);
 
             if (! class_exists($module->manifest->provider)) {
@@ -320,10 +316,11 @@ class ModuleManager implements ModuleManagerContract
                 throw new InvalidModuleSourceException(sprintf('The module [%s] has incompatible module dependencies.', $module->key));
             }
 
-            $this->frontendAssets->ensureValid($module->manifest, $module->path);
+            $this->features->ensureValid($module->manifest, $module->path);
             $publishingFrontend = true;
-            $this->frontendAssets->publish($module->manifest, $module->path);
+            $this->features->publish($module->manifest, $module->path);
             $publishingFrontend = false;
+            $this->app->make(InstallationOperations::class)->stage('installing');
             $this->database->run($module);
         } catch (Throwable $exception) {
             $code = match (true) {
@@ -344,8 +341,6 @@ class ModuleManager implements ModuleManagerContract
             'installed_at' => now(),
         ]);
         $this->health->recover($updated);
-        $this->frontendRegistry->refresh();
-        $this->navigation->refresh();
         event(new ModuleInstalled($module->key, $module->manifest));
     }
 
@@ -376,7 +371,6 @@ class ModuleManager implements ModuleManagerContract
             'disabled_at' => now(),
         ]);
         $this->registry->refresh();
-        $this->frontendRegistry->refresh();
         event(new ModuleDisabled((string) $module->key, $module->toManifest()));
 
         return true;

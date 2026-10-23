@@ -24,6 +24,14 @@ packages; each one is a folder with a `module.json` manifest.
 - check whether the `modules` table or a `module:*` command namespace is already in use
   before installing, since Bedrock registers both
 
+For a new application, prefer the official core-only starter when it is available:
+
+```bash
+laravel new new-project --using=frolaxhq/bedrock-starter
+```
+
+Add only the optional integrations and modules the application actually needs after creation.
+
 ### 2. Install and publish
 
 ```bash
@@ -35,6 +43,19 @@ php artisan migrate
 The `bedrock` tag publishes the same configuration file. The `modules` migration is loaded
 from the package and is not publishable, so never copy it into the application's migrations
 directory.
+
+Core does not require Inertia or Spatie Permission. Select optional Composer packages:
+`frolaxhq/bedrock-access-spatie` for Spatie grants/roles, `frolaxhq/bedrock-admin` for the
+Blade console (includes that adapter), and `frolaxhq/bedrock-frontend` for Inertia, module
+artifacts, navigation, and frontend authoring. The npm `@frolax/bedrock` package supplies
+React/UI/Vite+ tooling separately. Keep authentication and the User model in the host.
+
+When migrating an all-in-one Bedrock host, require its used companion packages in the
+same Composer update as core. Preserve published configuration, User traits, existing
+tables, grants, and module data; never force-republish or duplicate old migrations. Enable
+`bedrock.administration.enabled` explicitly for the authenticated console. Public PHP
+class and command names remain available from their owning packages. Keep the npm entry
+point `@frolax/bedrock/vite`; request `module:make --frontend` for React modules.
 
 ### 3. Configure
 
@@ -65,7 +86,7 @@ application root; an absolute path is used as is.
         'max_entries' => 10000,
         'max_path_length' => 240,
     ],
-    'locks' => ['store' => null, 'seconds' => 30, 'wait' => 5],
+    'locks' => ['store' => null, 'seconds' => 1500, 'wait' => 5],
     'cache' => [
         'enabled' => true,
         'store' => null,
@@ -83,6 +104,21 @@ missing, so an unmigrated app still boots.
 Set it explicitly when testing version-constrained modules against `dev-main`.
 
 ### 4. Register a module
+
+New modules own `composer.json` and a committed `composer.lock`. Put private SDKs there;
+keep host Laravel/Bedrock/Spatie requirements in `module.json.composer.require`. Run
+`module:prepare {key}` then test the scoped runtime before `module:pack`. Use
+`module:prepare {key} --force` to rebuild after source/lock changes; restart workers after
+deploying rebuilt code. Installation still rejects stale supplied artifacts. Packaging
+includes the isolated PHP runtime by default and omits raw vendor. `--without-php-runtime` packages
+locked sources instead; installation prepares/downloads locked dependencies when needed.
+`module:install --offline` forbids downloads; `--queue` schedules a dedicated background
+installation. Missing/stale locks and unsupported scoping must be repaired by the author.
+Never expose private SDK classes across module boundaries or modify host Composer files
+to resolve a private SDK. Shared host integrations still require explicit host installation.
+Admin installs require an asynchronous `bedrock-install` worker and show operation status;
+`sync` queues are rejected. Failed migrations require explicit repair/retry. Ready-built
+runtime ZIPs need neither Composer nor internet. Old Composer-less modules remain supported.
 
 Create `modules/<key>/module.json`. `key`, `name`, `version` and `provider` are required;
 `key` must match the directory name and is lowercase letters, digits and dashes.
@@ -194,45 +230,99 @@ Inject `Frolax\Bedrock\Module` when constructor injection is preferable. Resolve
 lower-level `ModuleRegistry` or `ModuleManager` contracts only when replacing or working
 with one part of the capability.
 
-### 8. Author and package a full-stack module
+### 8. Operate the administration console
+
+After installing `frolaxhq/bedrock-admin` and setting `bedrock.administration.enabled` to
+`true`, Bedrock provides a package-owned console at `/bedrock/admin` for authenticated users
+with the configured `bedrock.admin` permission. Prepare Spatie's tables and `HasRoles` on
+the configured user model, run `php artisan bedrock:admin-install`, and grant an existing
+user access with `php artisan bedrock:admin-user email@example.test`. The console can
+inspect module health, install a module already present in the module directory, enable
+or disable modules, edit declared settings, manage role permissions, and assign user roles.
+It needs no host Vite build. ZIP installs, module upgrades, and uninstall remain console
+workflows; do not present them as browser operations. Secret setting values are never
+shown in the UI, and the final administrator cannot be removed.
+
+Optional module pages can register with
+`Frolax\Bedrock\Services\Administration\AdminPageRegistry` during provider boot using
+`register($key, $label, $routeName, $permission, $moduleKey)`. Check its binding first.
+The registry filters links only; protect the route with host authentication,
+`RequireAdministrationEnabled`, the administration permission, and the page permission.
+Conventional module routes already guard module enablement.
+
+The optional backend-only `audit-log` module is installed from a validated ZIP with
+`module:install audit-log --zip=/path/to/audit-log-1.0.0.zip`, then `module:enable audit-log`.
+It records lifecycle/health, setting-key changes, and successful Bedrock access-adapter operations after
+commit; it does not observe application models or record secret values. Capture begins on
+the next application boot after enablement. Data is retained on disable/uninstall, with no
+automatic retention deletion. Grant `audit-log.view` to an administrator for its read-only
+screen. For explicit application events, resolve `Modules\AuditLog\AuditRecorder` only if
+its binding is available, then call `record('invoice.approved', 'invoice', (string) $id)`.
+Allowlist custom metadata in `audit-log.metadata_keys`. This module also runs on core alone.
+Direct Spatie API calls are not automatically observed.
+
+### 9. Author and package a full-stack module
 
 ```bash
-php artisan module:make billing
+composer require frolaxhq/bedrock-frontend
+php artisan module:make billing --frontend
 cd modules/billing
-pnpm install
-pnpm run types
+vp install
+vp check
+vp build
 cd ../..
-php artisan module:validate modules/billing
 php artisan module:pack billing --output=dist/modules
 ```
 
-Use `module:make billing --backend-only` when the module has no UI. Generation only creates
+`module:make billing` defaults to backend-only; `--backend-only` remains supported.
+`--frontend` requires the optional frontend package. Generation only creates
 files; it does not sync, migrate, install, or enable anything. `module:pack` requires an
-existing package-manager lockfile, runs the declared build without installing dependencies,
+existing frontend package-manager lockfile, runs the declared frontend build without installing npm dependencies,
 creates a deterministic ZIP, and validates that ZIP through the same hardened installer.
+Use `module:validate` on a clean source or staged package, not a working directory with
+pnpm `node_modules` symlinks.
 
 Frontend modules ship both browser federation and native ESM SSR artifacts. The generated
 artifact descriptor lists every runtime file and SHA-256 hash. Installation validates and
 publishes browser files to `public/vendor/bedrock/modules/<key>/<version>` and SSR files to
 `storage/framework/bedrock/frontend/<key>/<version>` before database work runs.
 
-### 9. Integrate a React/Inertia host
+### 10. Integrate a React/Inertia host
 
-The supported host is Laravel 13 with React 19, Inertia 3, TypeScript, Tailwind 4, and
-Vite 8. On a recognized React starter-kit layout:
+The supported host is Laravel 13 with React 19, Inertia 3, TypeScript, Tailwind 4,
+Node 24 LTS, and Vite+ 1.0. Run `vp migrate` at the application root before integrating
+an existing Vite host. On a recognized React starter-kit layout:
 
 ```bash
+composer require frolaxhq/bedrock-frontend
 php artisan frontend:install --check
 php artisan frontend:install --dry-run
 php artisan frontend:install
-pnpm install
+vp install
+vp check
 ```
 
 The command changes declarations and integration files only; it never runs a package
-manager. It is transactional and idempotent, and refuses unfamiliar files. The host keeps
+manager. It is transactional and idempotent, and refuses unfamiliar files. The installer
+adds Bedrock's shared checks and host plugin to an existing Vite+ configuration. It uses
+`mergeBedrockToolchain` to preserve the host's explicit overrides and a verified pnpm
+Vite+ catalog. For a new
+host, import `defineHostConfig` from `@frolax/bedrock/vite` and pass its Laravel plugin;
+the factory adds React, Tailwind, federation, and Bedrock's checks. Keep
+`laravel-vite-plugin` in the host's dev dependencies. Install UI libraries directly in
+the host only when host source imports them; Bedrock supplies its own UI dependencies.
+Generated modules import
+`defineModuleConfig` from the same entry point and need only their module key. Use its `vite`
+option for explicit Vite+ overrides and `plugins` for extra plugins. The host keeps
 React, React DOM, Inertia, and Bedrock's React/module/UI/theme runtimes as shared singletons,
 so module pages inherit the same context and overrides. Enabled frontend descriptors arrive
 in the reserved `__bedrock` Inertia prop and module pages use `module:{key}/{page}`.
+The `vite` dependency added to the host is an alias to Vite+ core for plugin peers, not a
+second frontend toolchain; `vite.config.ts` remains Vite+'s configuration filename.
+
+After module activation/removal in production, rebuild caches and reload workers.
+Module middleware rejects disabled routes even in a cached route collection, but running
+PHP processes cannot unload code. Drain queued module jobs before removing their classes.
 
 Bedrock's shared UI is generated with the official shadcn CLI using Base UI `base-nova`,
 Tabler icons, CSS-variable themes, and RTL output. Import package UI from
@@ -251,7 +341,7 @@ The command copies package source to the matching conventional path and never ov
 existing file. No manual registry update is required. Use `ThemeProvider` for light, dark,
 system, and `direction="ltr|rtl"`; redefine semantic variables in host `app.css` to theme
 host, Bedrock, and module UI together. During package development, `pnpm workbench:dev`
-starts Laravel plus host and canonical-module Vite servers with Fast Refresh.
+starts Laravel plus host and canonical-module Vite+ servers with Fast Refresh.
 
 Use `AuthLayout` for guest authentication flows and `AppLayout` for every authenticated user
 type. Bedrock reads the configured user attribute, shares the safe key as
@@ -269,7 +359,7 @@ inherits missing regions from `default`; `shell.tsx` replaces the complete shell
 `PanelSlot`, `PanelSidebarTrigger`, and `usePanel()` when authoring advanced shells. Keep
 authorization in Laravel gates and policies—a panel key controls presentation only.
 
-Author host navigation in `resources/js/navigation.ts`; Bedrock's Vite plugin detects it
+Author host navigation in `resources/js/navigation.ts`; Bedrock's Vite+ plugin detects it
 without registration. Author module navigation beside its page glob in the single module
 entry using `defineBedrockModule`, `defineNavigation`, `navigationItem`, and
 `navigationAction` from `@frolax/bedrock/module`. Definitions, item `resolve()` callbacks,
@@ -304,7 +394,7 @@ Frontend::page('billing', 'Invoices/Index');
 | `module:list` | List registered modules with version, status and path. |
 | `module:sync` | Reconcile the registry with the modules found on disk. |
 | `module:doctor {key?} {--json}` | Run operational checks with human or stable JSON output. |
-| `module:make {key} {--backend-only}` | Generate a full-stack or backend-only module without lifecycle side effects. |
+| `module:make {key} {--frontend} {--backend-only}` | Generate backend-only by default; request frontend source using the optional frontend package. |
 | `module:validate {source} {--json}` | Validate source and artifacts without executing module code. |
 | `module:pack {key-or-path} {--output=}` | Build from installed dependencies and create a deterministic validated ZIP. |
 | `module:install {key}` | Register a module directory that already exists. |
@@ -395,9 +485,9 @@ $path = ModuleManifestFactory::for('demo')
   `autoload.psr-4`; a missing or unsafe target marks module health failed.
 - Do not use arbitrary constraint syntax. `core` and `requires` use Composer constraints,
   and an invalid constraint rejects the complete manifest.
-- Do not assume `module:install` downloads missing dependencies. It recursively installs
-  only dependencies already present in the local module directory; marketplace delivery is
-  a later capability.
+- Do not confuse module dependencies with private PHP libraries. Required modules must
+  already be available locally; private Composer libraries may be downloaded from the module
+  lockfile when its runtime/vendor is absent. Marketplace delivery remains a later capability.
 - Do not build frontend modules on the consumer server. Publishers ship validated client
   and SSR artifacts; production installs need neither Node nor a host rebuild.
 - Do not author navigation in `module.json` or duplicate its security metadata manually.
@@ -409,7 +499,7 @@ $path = ModuleManifestFactory::for('demo')
   uninstalled. Mark its Bedrock catalog entry inactive; the Gate pre-check prevents use until
   a later module install declares it again.
 - Do not bundle React, Inertia, or Bedrock's shared frontend runtimes into a module. Bedrock's
-  Vite helper declares them as host-provided singletons and validates manifest requirements
+  Vite+ helper declares them as host-provided singletons and validates manifest requirements
   before loading.
 - Do not hand-edit recognized host entry files when `frontend:install` can compose
   them safely; if it refuses a layout, follow its manual guidance instead of forcing edits.

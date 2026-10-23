@@ -1,10 +1,18 @@
 // @vitest-environment node
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { bedrockHost, bedrockModule } from '../../src/vite/index.js';
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
+import {
+    bedrockHost,
+    bedrockModule,
+    bedrockToolchain,
+    defineHostConfig,
+    defineModuleConfig,
+    mergeBedrockToolchain,
+} from '../../src/vite/index.js';
 
 interface PluginHarness {
     name?: string;
@@ -26,15 +34,74 @@ interface PluginHarness {
 const roots: string[] = [];
 
 describe('panel convention plugin', () => {
+    it('publishes host and module plugins with the shared Vite+ toolchain', () => {
+        const manifest = JSON.parse(
+            readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+        ) as {
+            exports: Record<string, unknown>;
+        };
+
+        expect(bedrockHost).toBeTypeOf('function');
+        expect(bedrockModule).toBeTypeOf('function');
+        expect(bedrockToolchain.lint?.options?.typeCheck).toBe(true);
+        expect(bedrockToolchain.lint?.ignorePatterns).toContain('node_modules/**');
+        expect(manifest.exports['./vite']).toEqual({
+            types: './dist/vite/index.d.ts',
+            import: './dist/vite/index.js',
+        });
+        expect(manifest.exports['./vite-plus']).toBeUndefined();
+    });
+
+    it('supplies Bedrock host defaults while preserving explicit application settings', () => {
+        const config = defineHostConfig({
+            server: { port: 8123 },
+            lint: { rules: { 'no-console': 'off' } },
+        });
+
+        expect(config.server?.port).toBe(8123);
+        expect(config.lint?.rules?.['no-console']).toBe('off');
+        expect(config.lint?.options?.typeCheck).toBe(true);
+        expect(config.plugins).toBeDefined();
+        const merged = mergeBedrockToolchain({ lint: { rules: { 'no-console': 'off' } } });
+        expect(merged.lint?.options?.typeCheck).toBe(true);
+        expect(merged.lint?.rules?.['no-console']).toBe('off');
+        expect(merged.lint?.ignorePatterns).toContain('node_modules/**');
+    });
+
+    it('supplies module client and SSR defaults with explicit overrides', async () => {
+        const config = defineModuleConfig({ key: 'example', vite: { server: { port: 5180 } } });
+        const client = await config({ command: 'build', mode: 'production', isSsrBuild: false });
+        const server = await config({ command: 'build', mode: 'production', isSsrBuild: true });
+
+        expect(client.server?.port).toBe(5180);
+        expect(client.lint?.options?.typeCheck).toBe(true);
+        expect(client.build?.outDir).toBe('dist/bedrock/client');
+        expect(client.plugins).toBeDefined();
+        expect(server.build?.outDir).toBe('dist/bedrock/server');
+    });
     afterEach(async () => {
-        await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
+        await Promise.all(
+            roots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
+        );
     });
 
     it('generates the same eager panel registry for client and SSR builds', async () => {
         const root = await workspace();
-        await source(root, 'panels/default/slots/sidebar.tsx', 'export default function Sidebar() { return null }');
-        await source(root, 'panels/admin/shell.tsx', 'export default function Shell() { return null }');
-        await source(root, 'panels/admin/slots/sidebar-footer.tsx', 'export default function Footer() { return null }');
+        await source(
+            root,
+            'panels/default/slots/sidebar.tsx',
+            'export default function Sidebar() { return null }',
+        );
+        await source(
+            root,
+            'panels/admin/shell.tsx',
+            'export default function Shell() { return null }',
+        );
+        await source(
+            root,
+            'panels/admin/slots/sidebar-footer.tsx',
+            'export default function Footer() { return null }',
+        );
         const plugin = overridePlugin(root);
         const id = plugin.resolveId('virtual:bedrock-overrides')!;
         const generated = plugin.load(id)!;
@@ -61,7 +128,11 @@ describe('panel convention plugin', () => {
 
     it('rejects panel files outside the lowercase kebab-case convention', async () => {
         const root = await workspace();
-        await source(root, 'panels/Admin/slots/sidebar.tsx', 'export default function Sidebar() { return null }');
+        await source(
+            root,
+            'panels/Admin/slots/sidebar.tsx',
+            'export default function Sidebar() { return null }',
+        );
         const plugin = overridePlugin(root);
         const id = plugin.resolveId('virtual:bedrock-overrides')!;
 
@@ -99,7 +170,9 @@ describe('panel convention plugin', () => {
             ws: { send },
         });
 
-        expect(add).toHaveBeenCalledWith(expect.arrayContaining([path.join(root, 'resources/js/panels')]));
+        expect(add).toHaveBeenCalledWith(
+            expect.arrayContaining([path.join(root, 'resources/js/panels')]),
+        );
 
         const panel = path.join(root, 'resources/js/panels/admin/slots/sidebar-footer.tsx');
         handlers.get('add')?.(panel);
@@ -113,17 +186,20 @@ describe('panel convention plugin', () => {
 
     it('keeps the shared Bedrock UI and theme external to module SSR bundles', () => {
         const config = bedrockModule({ key: 'billing', entry: 'resources/js/pages.ts', ssr: true });
-        const external = config.build && 'rollupOptions' in config.build
-            ? config.build.rollupOptions?.external
-            : undefined;
+        const external =
+            config.build && 'rollupOptions' in config.build
+                ? config.build.rollupOptions?.external
+                : undefined;
 
-        expect(external).toEqual(expect.arrayContaining([
-            '@frolax/bedrock/react',
-            '@frolax/bedrock/module',
-            '@frolax/bedrock/ui',
-            '@frolax/bedrock/theme',
-            '@frolax/bedrock/ui-runtime',
-        ]));
+        expect(external).toEqual(
+            expect.arrayContaining([
+                '@frolax/bedrock/react',
+                '@frolax/bedrock/module',
+                '@frolax/bedrock/ui',
+                '@frolax/bedrock/theme',
+                '@frolax/bedrock/ui-runtime',
+            ]),
+        );
     });
 });
 

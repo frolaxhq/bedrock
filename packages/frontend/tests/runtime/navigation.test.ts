@@ -1,10 +1,6 @@
 import { createElement } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-    defineNavigation,
-    navigationAction,
-    navigationItem,
-} from '../../src/module/index.js';
+import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { defineNavigation, navigationAction, navigationItem } from '../../src/module/index.js';
 import type { NavigationResolution } from '../../src/module/index.js';
 import type { NavigationContext, NavigationRuntime } from '../../src/runtime/navigation.js';
 import {
@@ -82,19 +78,41 @@ describe('prepareNavigation', () => {
     });
 
     it('merges host and module resolutions, filtering the host by panel and permission', async () => {
-        registerHostNavigation(defineNavigation({
-            items: [
-                navigationItem({ key: 'dashboard', label: 'Dashboard', href: '/', panels: ['default', 'staff'] }),
-                navigationItem({ key: 'secrets', label: 'Secrets', href: '/secrets', permission: 'view-secrets' }),
-            ],
-        }));
+        registerHostNavigation(
+            defineNavigation({
+                items: [
+                    navigationItem({
+                        key: 'dashboard',
+                        label: 'Dashboard',
+                        href: '/',
+                        panels: ['default', 'staff'],
+                    }),
+                    navigationItem({
+                        key: 'secrets',
+                        label: 'Secrets',
+                        href: '/secrets',
+                        permission: 'view-secrets',
+                    }),
+                ],
+            }),
+        );
         const moduleRuntime = runtime({
             resolveNavigation: vi.fn().mockResolvedValue({
                 groups: [{ key: 'commerce', label: 'Commerce', order: 20 }],
                 items: [
                     {
-                        ...navigationItem({ key: 'billing', label: 'Billing', route: 'billing.index', icon: FakeIcon }),
-                        badge: '3', active: false, visible: true, disabled: false, loading: false, children: [],
+                        ...navigationItem({
+                            key: 'billing',
+                            label: 'Billing',
+                            route: 'billing.index',
+                            icon: FakeIcon,
+                        }),
+                        badge: '3',
+                        active: false,
+                        visible: true,
+                        disabled: false,
+                        loading: false,
+                        children: [],
                     },
                 ],
             }),
@@ -104,7 +122,10 @@ describe('prepareNavigation', () => {
             navigation: [envelope()],
         });
 
-        const resolution = await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime));
+        const resolution = await prepareNavigation(
+            shared,
+            vi.fn().mockResolvedValue(moduleRuntime),
+        );
 
         expect(resolution.items.map((item) => item.key)).toEqual(['dashboard', 'billing']);
         expect(resolution.groups).toEqual([]);
@@ -127,7 +148,11 @@ describe('prepareNavigation', () => {
                         route: 'billing.admin',
                         permission: 'billing.admin',
                     }),
-                    navigationItem({ key: 'smuggled', label: 'Smuggled', route: 'billing.smuggled' }),
+                    navigationItem({
+                        key: 'smuggled',
+                        label: 'Smuggled',
+                        route: 'billing.smuggled',
+                    }),
                 ],
             }),
         });
@@ -136,7 +161,10 @@ describe('prepareNavigation', () => {
             navigation: [envelope()],
         });
 
-        const resolution = await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime));
+        const resolution = await prepareNavigation(
+            shared,
+            vi.fn().mockResolvedValue(moduleRuntime),
+        );
 
         expect(resolution.items).toHaveLength(1);
         expect(resolution.items[0]!.key).toBe('billing');
@@ -148,16 +176,25 @@ describe('prepareNavigation', () => {
 
     it('keeps the authorized static envelope when a resolver fails or times out', async () => {
         const moduleRuntime = runtime({
-            resolveNavigation: vi.fn().mockImplementation(
-                () => new Promise((resolve) => setTimeout(() => resolve({ groups: [], items: [] }), 100)),
-            ),
+            resolveNavigation: vi
+                .fn()
+                .mockImplementation(
+                    () =>
+                        new Promise((resolve) =>
+                            setTimeout(() => resolve({ groups: [], items: [] }), 100),
+                        ),
+                ),
         });
         const shared = page({
             viewer: { panel: 'admin', permissions: ['billing.view'] },
             navigation: [envelope({ active: true })],
         });
 
-        const resolution = await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime), { timeout: 10 });
+        const resolution = await prepareNavigation(
+            shared,
+            vi.fn().mockResolvedValue(moduleRuntime),
+            { timeout: 10 },
+        );
 
         expect(resolution.items).toHaveLength(1);
         expect(resolution.items[0]!.label).toBe('Billing');
@@ -196,24 +233,39 @@ describe('prepareNavigation', () => {
 
         const first = prepareNavigation(shared, loadModule, { timeout: 5_000 });
         await flush();
-        await prepareNavigation(page({ viewer: { panel: 'admin', permissions: [] } }), vi.fn().mockResolvedValue(runtime()));
+        await prepareNavigation(
+            page({ viewer: { panel: 'admin', permissions: [] } }),
+            vi.fn().mockResolvedValue(runtime()),
+        );
 
         expect(firstContext!.signal.aborted).toBe(true);
         await expect(first).rejects.toThrow();
     });
 
     it('reuses the SSR snapshot without running resolvers again and rebinds icons and actions', async () => {
-        registerHostNavigation(defineNavigation({
-            items: [
-                navigationItem({ key: 'dashboard', label: 'Dashboard', href: '/', icon: FakeIcon }),
-            ],
-        }));
+        registerHostNavigation(
+            defineNavigation({
+                items: [
+                    navigationItem({
+                        key: 'dashboard',
+                        label: 'Dashboard',
+                        href: '/',
+                        icon: FakeIcon,
+                    }),
+                ],
+            }),
+        );
         const moduleRuntime = runtime({
             resolveNavigation: vi.fn(),
             materializeNavigation: vi.fn().mockResolvedValue({
                 groups: [],
                 items: [
-                    navigationItem({ key: 'billing', label: 'Billing', route: 'billing.index', icon: FakeIcon }),
+                    navigationItem({
+                        key: 'billing',
+                        label: 'Billing',
+                        route: 'billing.index',
+                        icon: FakeIcon,
+                    }),
                     navigationAction({ key: 'sync', label: 'Sync', run: vi.fn() }),
                 ],
             }),
@@ -257,7 +309,10 @@ describe('prepareNavigation', () => {
             resolved: snapshot,
         });
 
-        const resolution = await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime));
+        const resolution = await prepareNavigation(
+            shared,
+            vi.fn().mockResolvedValue(moduleRuntime),
+        );
 
         expect(moduleRuntime.resolveNavigation).not.toHaveBeenCalled();
         expect(resolution.items.find((item) => item.key === 'billing')!.icon).toBe(FakeIcon);
@@ -281,18 +336,29 @@ describe('prepareNavigation', () => {
                 items: [navigationAction({ key: 'sync', label: 'Sync', run: vi.fn() })],
             }),
         });
-        const loadModule = vi.fn()
+        const loadModule = vi
+            .fn()
             .mockResolvedValueOnce(firstRuntime)
             .mockResolvedValueOnce(secondRuntime);
 
-        await prepareNavigation(page({
-            viewer: { panel: 'admin', permissions: [] },
-            navigation: [envelope({ key: 'flush', kind: 'action', route: undefined, href: undefined })],
-        }), loadModule);
-        await prepareNavigation(page({
-            viewer: { panel: 'admin', permissions: [] },
-            navigation: [envelope({ key: 'sync', kind: 'action', route: undefined, href: undefined })],
-        }), loadModule);
+        await prepareNavigation(
+            page({
+                viewer: { panel: 'admin', permissions: [] },
+                navigation: [
+                    envelope({ key: 'flush', kind: 'action', route: undefined, href: undefined }),
+                ],
+            }),
+            loadModule,
+        );
+        await prepareNavigation(
+            page({
+                viewer: { panel: 'admin', permissions: [] },
+                navigation: [
+                    envelope({ key: 'sync', kind: 'action', route: undefined, href: undefined }),
+                ],
+            }),
+            loadModule,
+        );
 
         await expect(runNavigationAction('billing:flush')).resolves.toBeUndefined();
         expect(firstRuntime.runNavigationAction).not.toHaveBeenCalled();
@@ -302,16 +368,20 @@ describe('prepareNavigation', () => {
     });
 
     it('sorts merged items and groups by order then label', async () => {
-        registerHostNavigation(defineNavigation({
-            items: [navigationItem({ key: 'zeta', label: 'Zeta', href: '/', order: 5 })],
-        }));
+        registerHostNavigation(
+            defineNavigation({
+                items: [navigationItem({ key: 'zeta', label: 'Zeta', href: '/', order: 5 })],
+            }),
+        );
         const moduleRuntime = runtime({
             resolveNavigation: vi.fn().mockResolvedValue({
                 groups: [
                     { key: 'beta-group', label: 'Beta group', order: 2 },
                     { key: 'alpha-group', label: 'Alpha group', order: 2 },
                 ],
-                items: [navigationItem({ key: 'beta', label: 'Beta', route: 'beta.index', order: 1 })],
+                items: [
+                    navigationItem({ key: 'beta', label: 'Beta', route: 'beta.index', order: 1 }),
+                ],
             }),
         });
         const shared = page({
@@ -319,7 +389,10 @@ describe('prepareNavigation', () => {
             navigation: [envelope({ key: 'alpha', label: 'Alpha', order: 1, group: null })],
         });
 
-        const resolution = await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime));
+        const resolution = await prepareNavigation(
+            shared,
+            vi.fn().mockResolvedValue(moduleRuntime),
+        );
 
         expect(resolution.items.map((item) => item.key)).toEqual(['alpha', 'zeta']);
         expect(resolution.groups).toEqual([]);
@@ -332,10 +405,14 @@ describe('prepareNavigation', () => {
         });
         const shared = page({
             viewer: { panel: 'admin', permissions: [] },
-            navigation: [envelope({ key: 'flush', kind: 'action', route: undefined, href: undefined })],
+            navigation: [
+                envelope({ key: 'flush', kind: 'action', route: undefined, href: undefined }),
+            ],
         });
 
-        await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime), { notify: { error } });
+        await prepareNavigation(shared, vi.fn().mockResolvedValue(moduleRuntime), {
+            notify: { error },
+        });
 
         await expect(runNavigationAction('billing:flush')).rejects.toThrow('sync failed');
         expect(error).toHaveBeenCalledWith('sync failed');

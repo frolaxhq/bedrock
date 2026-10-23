@@ -1,7 +1,11 @@
 parameters:
     level: 7
+    bootstrapFiles:
+        - tests/phpstan-bootstrap.php
     paths:
         - src
         - config
         - database
+        - packages/php
+        - modules/audit-log
     tmpDir: build/phpstan

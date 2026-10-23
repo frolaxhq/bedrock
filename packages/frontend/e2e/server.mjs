@@ -21,20 +21,28 @@ const clientRoot = resolve(moduleRoot, 'dist/bedrock/client');
 const serverEntry = resolve(moduleRoot, 'dist/bedrock/server/entry.mjs');
 
 registerFrontendPanels({
-    admin: { slots: { 'sidebar-footer': () => createElement('div', null, 'Administrator panel footer') } },
+    admin: {
+        slots: { 'sidebar-footer': () => createElement('div', null, 'Administrator panel footer') },
+    },
 });
-registerHostNavigation(defineNavigation({
-    items: [navigationItem({
-        key: 'dashboard',
-        label: 'Dashboard',
-        href: '/',
-        panels: ['admin'],
-        active: ['/'],
-        icon: IconDashboard,
-    })],
-}));
+registerHostNavigation(
+    defineNavigation({
+        items: [
+            navigationItem({
+                key: 'dashboard',
+                label: 'Dashboard',
+                href: '/',
+                panels: ['admin'],
+                active: ['/'],
+                icon: IconDashboard,
+            }),
+        ],
+    }),
+);
 
-const artifact = JSON.parse(await readFile(resolve(moduleRoot, 'dist/bedrock/frontend.json'), 'utf8'));
+const artifact = JSON.parse(
+    await readFile(resolve(moduleRoot, 'dist/bedrock/frontend.json'), 'utf8'),
+);
 
 function Home() {
     return createElement(
@@ -59,7 +67,7 @@ const resolvePage = createBedrockResolver({
     versions: {
         react: '19.3.0',
         'react-dom': '19.3.0',
-        '@inertiajs/react': '3.7.1',
+        '@inertiajs/react': '3.8.0',
         '@frolax/bedrock': '1.0.0',
     },
 });
@@ -69,7 +77,10 @@ createServer(async (request, response) => {
         const url = new URL(request.url ?? '/', 'http://127.0.0.1:4179');
 
         if (url.pathname === '/__build') {
-            return json(response, JSON.parse(await readFile(resolve(artifactRoot, 'build-order.json'), 'utf8')));
+            return json(
+                response,
+                JSON.parse(await readFile(resolve(artifactRoot, 'build-order.json'), 'utf8')),
+            );
         }
 
         if (url.pathname.startsWith('/assets/')) {
@@ -93,11 +104,8 @@ createServer(async (request, response) => {
             page,
             resolve: resolvePage,
             render: renderToString,
-            setup: ({ App, props }) => createElement(
-                ThemeProvider,
-                { direction: 'rtl' },
-                createElement(App, props),
-            ),
+            setup: ({ App, props }) =>
+                createElement(ThemeProvider, { direction: 'rtl' }, createElement(App, props)),
         });
         const heads = rendered.head.join('\n');
         const html = `<!doctype html><html dir="rtl"><head>${heads}</head><body>${rendered.body}<script type="module" src="/assets/app.js"></script></body></html>`;
@@ -136,7 +144,10 @@ function pageFor(pathname) {
                         driver: 'inertia-react',
                         client: '/vendor/bedrock/modules/example/1.0.0/mf-manifest.json',
                         server: serverEntry,
-                        css: artifact.client.css.map((file) => `/vendor/bedrock/modules/example/1.0.0/${file.replace(/^client\//, '')}`),
+                        css: artifact.client.css.map(
+                            (file) =>
+                                `/vendor/bedrock/modules/example/1.0.0/${file.replace(/^client\//, '')}`,
+                        ),
                         requires: {
                             react: '^19.0',
                             'react-dom': '^19.0',
@@ -172,9 +183,10 @@ function moduleNavigation(items, pathname, parent = null) {
         order: item.order,
         ...(item.permission ? { permission: `example.${item.permission}` } : {}),
         panels: item.panels,
-        active: item.route === 'example.index'
-            ? pathname.startsWith('/example')
-            : item.route === 'example.history' && pathname === '/example/history',
+        active:
+            item.route === 'example.index'
+                ? pathname.startsWith('/example')
+                : item.route === 'example.history' && pathname === '/example/history',
         parent: parent ?? item.parent ?? null,
         children: moduleNavigation(item.children, pathname, item.key),
     }));
@@ -187,6 +199,9 @@ async function file(response, path) {
 }
 
 function json(response, value) {
-    response.writeHead(200, { 'Content-Type': 'application/json', 'X-Inertia': response.getHeader('X-Inertia') ?? '' });
+    response.writeHead(200, {
+        'Content-Type': 'application/json',
+        'X-Inertia': response.getHeader('X-Inertia') ?? '',
+    });
     response.end(JSON.stringify(value));
 }

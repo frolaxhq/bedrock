@@ -93,8 +93,12 @@ export function ThemeProvider({
     storageKey = 'bedrock.theme.mode',
     theme,
 }: ThemeProviderProps) {
-    const [storedMode, setStoredMode] = useState<ThemeMode>(() => readMode(storageKey) ?? defaultMode);
-    const [storedDirection, setStoredDirection] = useState<TextDirection>(() => readDirection() ?? defaultDirection);
+    const [storedMode, setStoredMode] = useState<ThemeMode>(
+        () => readMode(storageKey) ?? defaultMode,
+    );
+    const [storedDirection, setStoredDirection] = useState<TextDirection>(
+        () => readDirection() ?? defaultDirection,
+    );
     const [systemMode, setSystemMode] = useState<'light' | 'dark'>(() => preferredMode());
     const mode = controlledMode ?? storedMode;
     const direction = controlledDirection ?? storedDirection;
@@ -192,9 +196,9 @@ function readStoredDirection(): TextDirection | undefined {
 }
 
 function preferredMode(): 'light' | 'dark' {
-    return typeof window !== 'undefined'
-        && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-color-scheme: dark)').matches
+    return typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light';
 }
@@ -202,7 +206,11 @@ function preferredMode(): 'light' | 'dark' {
 function readDirection(): TextDirection | undefined {
     if (typeof document === 'undefined') return undefined;
 
-    return document.documentElement.dir === 'rtl' ? 'rtl' : document.documentElement.dir === 'ltr' ? 'ltr' : undefined;
+    return document.documentElement.dir === 'rtl'
+        ? 'rtl'
+        : document.documentElement.dir === 'ltr'
+          ? 'ltr'
+          : undefined;
 }
 
 function applyTokens(root: HTMLElement, tokens?: ThemeTokens): void {

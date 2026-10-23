@@ -25,10 +25,15 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="Core">
+            <directory>tests/Core</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
             <directory suffix=".php">src</directory>
+            <directory suffix=".php">packages/php</directory>
+            <directory suffix=".php">modules/audit-log/src</directory>
         </include>
     </source>
     <php>

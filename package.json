@@ -1,19 +1,23 @@
 {
     "name": "frolax-bedrock-workspace",
     "private": true,
-    "packageManager": "pnpm@10.19.0",
     "scripts": {
         "frontend:build": "pnpm --filter @frolax/bedrock build",
-        "frontend:check": "pnpm --filter @frolax/bedrock check",
+        "frontend:check": "vp check",
         "frontend:generate": "pnpm --filter @frolax/bedrock generate",
         "frontend:generate:check": "pnpm --filter @frolax/bedrock generate:check",
-        "frontend:e2e": "pnpm --filter @frolax/bedrock test:e2e",
+        "frontend:e2e": "vp run @frolax/bedrock#test:e2e",
         "frontend:test": "pnpm --filter @frolax/bedrock test",
         "frontend:pack": "pnpm --filter @frolax/bedrock exec npm pack --dry-run",
-        "workbench:build": "pnpm frontend:build && pnpm --filter @frolax/bedrock-workbench build && pnpm --filter @modules/example build",
-        "workbench:dev": "pnpm frontend:build && concurrently --kill-others --names laravel,host,module --prefix-colors blue,magenta,green \"php vendor/bin/testbench serve --host=127.0.0.1 --port=8000\" \"pnpm --filter @frolax/bedrock-workbench dev\" \"pnpm --filter @modules/example dev --host=127.0.0.1 --port=5180\""
+        "workbench:build": "pnpm frontend:build && vp run @frolax/bedrock-workbench#build && vp run @modules/example#build",
+        "workbench:dev": "pnpm frontend:build && concurrently --kill-others --names laravel,host,module --prefix-colors blue,magenta,green \"php vendor/bin/testbench serve --host=127.0.0.1 --port=8000\" \"vp -C workbench dev --host=127.0.0.1 --port=5173\" \"vp -C workbench/modules/example dev --host=127.0.0.1 --port=5180\""
     },
     "devDependencies": {
-        "concurrently": "^10.0.5"
-    }
+        "concurrently": "^10.0.5",
+        "vite-plus": "catalog:"
+    },
+    "engines": {
+        "node": "^24.11.0"
+    },
+    "packageManager": "pnpm@10.34.6"
 }

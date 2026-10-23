@@ -18,7 +18,15 @@ import {
     type ReactNode,
 } from 'react';
 import { cn } from 'cn';
-import { Button, PanelBrand, PanelHeader, PanelNavigation, PanelUserMenu, Toaster, toast } from '../generated.js';
+import {
+    Button,
+    PanelBrand,
+    PanelHeader,
+    PanelNavigation,
+    PanelUserMenu,
+    Toaster,
+    toast,
+} from '../generated.js';
 import { useFrontendPanel, type FrontendPanelComponent } from '../runtime.js';
 import type { BedrockNavigationItem } from '../../runtime/types.js';
 import type { BedrockViewer } from '../../runtime/types.js';
@@ -105,43 +113,49 @@ export function PanelProvider({
 
     const hasSlot = useCallback((name: string) => Boolean(resolved.slots[name]), [resolved.slots]);
     const toggleSidebar = useCallback(() => {
-        if (typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px)').matches) {
+        if (
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(min-width: 768px)').matches
+        ) {
             setSidebarCollapsed((collapsed) => !collapsed);
         } else {
             setMobileSidebarOpen((open) => !open);
         }
     }, []);
-    const value = useMemo<InternalPanelContextValue>(() => ({
-        panel: resolved.key,
-        requestedPanel,
-        navigation,
-        viewer,
-        url,
-        brand,
-        sidebarCollapsed,
-        mobileSidebarOpen,
-        setSidebarCollapsed,
-        setMobileSidebarOpen,
-        toggleSidebar,
-        hasSlot,
-        preferenceReady,
-        shell: resolved.shell,
-        slots: resolved.slots,
-    }), [
-        hasSlot,
-        mobileSidebarOpen,
-        navigation,
-        viewer,
-        url,
-        brand,
-        preferenceReady,
-        requestedPanel,
-        resolved.key,
-        resolved.shell,
-        resolved.slots,
-        sidebarCollapsed,
-        toggleSidebar,
-    ]);
+    const value = useMemo<InternalPanelContextValue>(
+        () => ({
+            panel: resolved.key,
+            requestedPanel,
+            navigation,
+            viewer,
+            url,
+            brand,
+            sidebarCollapsed,
+            mobileSidebarOpen,
+            setSidebarCollapsed,
+            setMobileSidebarOpen,
+            toggleSidebar,
+            hasSlot,
+            preferenceReady,
+            shell: resolved.shell,
+            slots: resolved.slots,
+        }),
+        [
+            hasSlot,
+            mobileSidebarOpen,
+            navigation,
+            viewer,
+            url,
+            brand,
+            preferenceReady,
+            requestedPanel,
+            resolved.key,
+            resolved.shell,
+            resolved.slots,
+            sidebarCollapsed,
+            toggleSidebar,
+        ],
+    );
 
     return (
         <PanelContext.Provider value={value}>
@@ -169,13 +183,24 @@ export function PanelShell(props: PanelShellProps) {
     return Shell ? <Shell {...props} /> : <DefaultPanelShell {...props} />;
 }
 
-export function PanelSidebarTrigger({ className, disabled, id, mode = 'desktop', onClick, ...props }: PanelSidebarTriggerProps) {
+export function PanelSidebarTrigger({
+    className,
+    disabled,
+    id,
+    mode = 'desktop',
+    onClick,
+    ...props
+}: PanelSidebarTriggerProps) {
     const panel = usePanelContext();
     const mobile = mode === 'mobile';
     const expanded = mobile ? panel.mobileSidebarOpen : !panel.sidebarCollapsed;
     const label = mobile
-        ? (expanded ? 'Close navigation' : 'Open navigation')
-        : (expanded ? 'Collapse navigation' : 'Expand navigation');
+        ? expanded
+            ? 'Close navigation'
+            : 'Open navigation'
+        : expanded
+          ? 'Collapse navigation'
+          : 'Expand navigation';
 
     const button = (
         <Button
@@ -188,24 +213,29 @@ export function PanelSidebarTrigger({ className, disabled, id, mode = 'desktop',
             id={id ?? (mobile ? 'bedrock-panel-mobile-sidebar-trigger' : undefined)}
             className={cn('shrink-0', className)}
             disabled={disabled || !panel.preferenceReady}
-            onClick={mobile ? onClick : (event) => {
-                onClick?.(event);
+            onClick={
+                mobile
+                    ? onClick
+                    : (event) => {
+                          onClick?.(event);
 
-                if (!event.defaultPrevented) panel.setSidebarCollapsed(!panel.sidebarCollapsed);
-            }}
+                          if (!event.defaultPrevented)
+                              panel.setSidebarCollapsed(!panel.sidebarCollapsed);
+                      }
+            }
             {...props}
         >
-            {mobile
-                ? <IconMenu2 aria-hidden="true" />
-                : panel.sidebarCollapsed
-                    ? <IconLayoutSidebarLeftExpand className="rtl:scale-x-[-1]" aria-hidden="true" />
-                    : <IconLayoutSidebarLeftCollapse className="rtl:scale-x-[-1]" aria-hidden="true" />}
+            {mobile ? (
+                <IconMenu2 aria-hidden="true" />
+            ) : panel.sidebarCollapsed ? (
+                <IconLayoutSidebarLeftExpand className="rtl:scale-x-[-1]" aria-hidden="true" />
+            ) : (
+                <IconLayoutSidebarLeftCollapse className="rtl:scale-x-[-1]" aria-hidden="true" />
+            )}
         </Button>
     );
 
-    return mobile
-        ? <DialogPrimitive.Trigger render={button} />
-        : button;
+    return mobile ? <DialogPrimitive.Trigger render={button} /> : button;
 }
 
 function DefaultPanelShell({ children, className, style, ...props }: PanelShellProps) {
@@ -232,12 +262,19 @@ function DefaultPanelShell({ children, className, style, ...props }: PanelShellP
         >
             <DesktopSidebar />
             <div className="flex min-h-screen min-w-0 flex-col">
-                <header data-slot="panel-header" className="flex min-h-14 items-center gap-2 border-b border-border px-3 md:px-4">
+                <header
+                    data-slot="panel-header"
+                    className="flex min-h-14 items-center gap-2 border-b border-border px-3 md:px-4"
+                >
                     <PanelSidebarTrigger mode="mobile" className="md:hidden" />
                     <PanelSidebarTrigger mode="desktop" className="hidden md:inline-flex" />
-                    <div className="min-w-0 flex-1"><PanelSlot name="header" fallback={<PanelHeader url={panel.url} />} /></div>
+                    <div className="min-w-0 flex-1">
+                        <PanelSlot name="header" fallback={<PanelHeader url={panel.url} />} />
+                    </div>
                 </header>
-                <main data-slot="panel-content" className="min-w-0 flex-1">{children}</main>
+                <main data-slot="panel-content" className="min-w-0 flex-1">
+                    {children}
+                </main>
                 {panel.hasSlot('footer') && (
                     <footer data-slot="panel-footer" className="border-t border-border">
                         <PanelSlot name="footer" />
@@ -254,7 +291,8 @@ function DefaultPanelShell({ children, className, style, ...props }: PanelShellP
 function NavigationNotificationBridge() {
     useEffect(() => {
         const notify = (event: Event) => {
-            const detail = (event as CustomEvent<{ type?: 'success' | 'error'; message?: string }>).detail;
+            const detail = (event as CustomEvent<{ type?: 'success' | 'error'; message?: string }>)
+                .detail;
 
             if (!detail?.message) return;
 
@@ -296,7 +334,14 @@ function MobileSidebar() {
             >
                 <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
                 <DialogPrimitive.Close
-                    render={<Button type="button" variant="ghost" size="icon" className="absolute end-2 top-2" />}
+                    render={
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute end-2 top-2"
+                        />
+                    }
                 >
                     <IconX aria-hidden="true" />
                     <span className="sr-only">Dismiss navigation</span>
@@ -312,15 +357,24 @@ function PanelSidebarRegions() {
 
     return (
         <>
-            <div data-slot="panel-sidebar-header" className="shrink-0 border-b border-sidebar-border">
+            <div
+                data-slot="panel-sidebar-header"
+                className="shrink-0 border-b border-sidebar-border"
+            >
                 <PanelSlot name="sidebar-header" fallback={<PanelBrand name={panel.brand} />} />
             </div>
             <div data-slot="panel-sidebar-content" className="min-h-0 flex-1 overflow-y-auto">
                 <PanelSlot name="sidebar" fallback={<PanelNavigation />} />
             </div>
             {(panel.hasSlot('sidebar-footer') || panel.viewer) && (
-                <div data-slot="panel-sidebar-footer" className="shrink-0 border-t border-sidebar-border">
-                    <PanelSlot name="sidebar-footer" fallback={<PanelUserMenu viewer={panel.viewer} />} />
+                <div
+                    data-slot="panel-sidebar-footer"
+                    className="shrink-0 border-t border-sidebar-border"
+                >
+                    <PanelSlot
+                        name="sidebar-footer"
+                        fallback={<PanelUserMenu viewer={panel.viewer} />}
+                    />
                 </div>
             )}
         </>

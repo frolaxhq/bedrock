@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Services\Module\Authoring;
 
-use Frolax\Bedrock\Contracts\Frontend\FrontendAssetManager;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
 use Frolax\Bedrock\Services\Module\Install\ModulePackageValidator;
+use Frolax\Bedrock\Services\Module\ModuleFeatureHandlers;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 use Frolax\Bedrock\Support\Module\ModuleManifest;
 
 class ModuleSourceValidator
@@ -17,7 +18,7 @@ class ModuleSourceValidator
         protected ModulePackageValidator $packages,
         protected ModuleManifest $manifests,
         protected ModuleAutoloader $autoload,
-        protected FrontendAssetManager $frontend,
+        protected ModuleFeatureHandlers $frontend,
         protected string $manifestFile = 'module.json',
     ) {}
 
@@ -26,6 +27,8 @@ class ModuleSourceValidator
         $path = rtrim($path, '/\\');
         $this->packages->validate($path);
         $manifest = $this->manifests->load($path.'/'.$this->manifestFile);
+        app(PhpRuntime::class)->validate($manifest, $path);
+        $this->frontend->ensureSupported($manifest);
         $failures = $this->autoload->failures($manifest, $path);
 
         if ($validateFrontend) {
