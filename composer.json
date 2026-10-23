@@ -54,6 +54,9 @@
     ]
   },
   "autoload-dev": {
+    "classmap": [
+      "tests/Fixtures/modules"
+    ],
     "psr-4": {
       "Frolax\\Bedrock\\Tests\\": "tests/",
       "Workbench\\App\\": "workbench/app/",

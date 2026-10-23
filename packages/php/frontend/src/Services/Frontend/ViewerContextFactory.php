@@ -6,6 +6,7 @@ namespace Frolax\Bedrock\Services\Frontend;
 
 use Frolax\Bedrock\Contracts\Permissions\ModulePermissions;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -105,17 +106,8 @@ class ViewerContextFactory
      */
     protected function permissions(Authenticatable $user): array
     {
-        if (! method_exists($user, 'getAllPermissions')) {
-            return [];
-        }
-
-        $granted = collect($user->getAllPermissions())
-            ->map(static fn (mixed $permission): string => (string) (
-                is_object($permission) && isset($permission->name) ? $permission->name : $permission
-            ));
-
         return array_values($this->permissions->activeNames()
-            ->intersect($granted)
+            ->filter(static fn (string $ability): bool => Gate::forUser($user)->allows($ability))
             ->sort()
             ->values()
             ->all());

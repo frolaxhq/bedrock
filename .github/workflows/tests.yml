@@ -93,7 +93,12 @@ jobs:
           composer run prepare
 
       - name: PHPStan
+        if: runner.os != 'Windows'
         run: composer analyse
+
+      - name: PHPStan (Windows serial bootstrap)
+        if: runner.os == 'Windows'
+        run: vendor/bin/phpstan analyse --debug --no-progress
 
       - name: Install isolated module build tools
         run: composer install --working-dir=resources/module-tools --no-dev --no-scripts --no-plugins --prefer-dist --no-interaction --no-progress
@@ -157,7 +162,7 @@ jobs:
         run: |
           touch database/database.sqlite
           php artisan vendor:publish --tag="bedrock-config" --force
-          sed -i '/^use Illuminate.*Notifiable;/a use Spatie\Permission\Traits\HasRoles;' app/Models/User.php
+          sed -i '/^use Illuminate.*Notifiable;/a use Spatie\\Permission\\Traits\\HasRoles;' app/Models/User.php
           sed -i 's/use HasFactory, Notifiable;/use HasFactory, Notifiable, HasRoles;/' app/Models/User.php
           sed -i "/'administration' => \[/,+1 s/'enabled' => false/'enabled' => true/" config/bedrock.php
           php artisan bedrock:admin-install || test $? -eq 1

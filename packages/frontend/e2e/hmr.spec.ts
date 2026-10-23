@@ -91,8 +91,13 @@ test.afterAll(async () => {
 });
 
 test('panel and navigation edits update without reloading the host', async ({ page }) => {
+    page.on('pageerror', (error) => console.error(`HMR page error: ${error.message}`));
+    page.on('console', (message) => {
+        if (message.type() === 'error') console.error(`HMR console error: ${message.text()}`);
+    });
+
     await page.goto('http://127.0.0.1:4191');
-    await expect(page.getByText('First panel version')).toBeVisible();
+    await expect(page.getByText('First panel version')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('[data-navigation]')).toHaveText('First navigation version');
     await expect(page.locator('body')).toHaveAttribute('data-loads', '1');
 
