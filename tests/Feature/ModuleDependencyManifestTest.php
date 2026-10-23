@@ -279,7 +279,18 @@ it('rejects symlinked dependency metadata including dangling links', function (s
         symlink($target.'.original', $target);
     } else {
         (new Filesystem)->ensureDirectoryExists(dirname($target));
-        symlink($this->dependencyPath.'/missing', $target);
+        $source = $this->dependencyPath.'/missing';
+
+        // Windows can reject dangling symlinks even when ordinary links work.
+        if (PHP_OS_FAMILY === 'Windows') {
+            if (str_ends_with($entry, '.json')) {
+                file_put_contents($source, '{}');
+            } else {
+                (new Filesystem)->ensureDirectoryExists($source);
+            }
+        }
+
+        symlink($source, $target);
     }
 
     expect(fn () => (new DependencyManifest)->inspect($this->dependencyManifest, $this->dependencyPath))

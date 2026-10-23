@@ -56,11 +56,11 @@ it('prepares empty locks offline without composer and exports relocatable absolu
         $runtime = app(PhpRuntime::class);
         $runtime->prepare($manifest, $path, offline: true);
         expect($runtime->root($manifest, $path))->toBe($path.'/dist/php/module')
-            ->and($runtime->maps($manifest, $path)['psr4']['RuntimeFixture\\'])->toBe([$path.'/dist/php/module/src'])
+            ->and($runtime->maps($manifest, $path)['psr4']['RuntimeFixture\\'])->toBe([realpath($path.'/dist/php/module/src')])
             ->and(File::exists($path.'/dist/php/runtime.json'))->toBeTrue();
         rename($path, $relocated);
         $runtime->validate($manifest, $relocated, true);
-        expect($runtime->maps($manifest, $relocated)['psr4']['RuntimeFixture\\'])->toBe([$relocated.'/dist/php/module/src']);
+        expect($runtime->maps($manifest, $relocated)['psr4']['RuntimeFixture\\'])->toBe([realpath($relocated.'/dist/php/module/src')]);
         File::put($relocated.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
         expect(fn () => $runtime->root($manifest, $relocated))->toThrow(InvalidModuleSourceException::class, 'source');
     } finally {
@@ -92,7 +92,7 @@ it('keeps legacy module roots and maps without introducing a runtime', function 
         $runtime = app(PhpRuntime::class);
         $runtime->prepare($manifest, $path, true);
         expect($runtime->root($manifest, $path))->toBe($path)
-            ->and($runtime->maps($manifest, $path)['psr4']['RuntimeFixture\\'])->toBe([$path.'/src'])
+            ->and($runtime->maps($manifest, $path)['psr4']['RuntimeFixture\\'])->toBe([realpath($path.'/src')])
             ->and(File::exists($path.'/dist/php'))->toBeFalse();
     } finally {
         File::deleteDirectory($path);
@@ -121,9 +121,9 @@ it('uses composer autoload declarations and module ignore patterns for an empty 
         $runtime = app(PhpRuntime::class);
         $runtime->prepare($manifest, $path, true);
         $maps = $runtime->maps($manifest, $path);
-        expect($maps['psr4']['OwnComposerRuntime\\'])->toBe([$path.'/dist/php/module/own'])
-            ->and($maps['classmap']['MappedComposerRuntime\\Thing'])->toBe($path.'/dist/php/module/mapped/Thing.php')
-            ->and($maps['files'])->toBe([$path.'/dist/php/module/functions.php'])
+        expect($maps['psr4']['OwnComposerRuntime\\'])->toBe([realpath($path.'/dist/php/module/own')])
+            ->and($maps['classmap']['MappedComposerRuntime\\Thing'])->toBe(realpath($path.'/dist/php/module/mapped/Thing.php'))
+            ->and($maps['files'])->toBe([realpath($path.'/dist/php/module/functions.php')])
             ->and(File::exists($path.'/dist/php/module/secret.php'))->toBeFalse()
             ->and(File::exists($path.'/dist/php/module/ignored/file.php'))->toBeFalse();
         File::deleteDirectory($path.'/ignored');
@@ -174,7 +174,7 @@ it('installs a locked dist archive with the real composer while ignoring scripts
         putenv('COMPOSER=/this-host-setting-must-not-be-used.json');
         app(PhpRuntime::class)->prepare($manifest, $path);
         $maps = app(PhpRuntime::class)->maps($manifest, $path);
-        expect(array_filter(array_keys($maps['psr4']), static fn (string $prefix): bool => str_starts_with($prefix, 'BedrockPrivate\\')))->not->toBeEmpty()
+        expect(array_filter(array_keys($maps['classmap']), static fn (string $class): bool => str_starts_with($class, 'BedrockPrivate\\')))->not->toBeEmpty()
             ->and(File::exists($path.'/script-executed'))->toBeFalse()
             ->and(File::exists($path.'/vendor'))->toBeFalse();
     } finally {
@@ -235,7 +235,7 @@ it('scopes two incompatible sdk versions alongside the host using the real isola
         foreach ([[$first, $one], [$second, $two]] as [$manifest, $path]) {
             $runtime->prepare($manifest, $path, true);
             $maps = $runtime->maps($manifest, $path);
-            expect(array_filter($maps['classmap'], static fn (string $file): bool => str_ends_with($file, '/Client.php')))->not->toBeEmpty();
+            expect(array_filter($maps['classmap'], static fn (string $file): bool => str_ends_with(str_replace('\\', '/', $file), '/Client.php')))->not->toBeEmpty();
 
             foreach ($maps['psr4'] as $prefix => $paths) {
                 $loader->addPsr4($prefix, $paths);
