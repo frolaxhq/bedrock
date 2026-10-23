@@ -178,7 +178,8 @@ jobs:
 
       - name: Exercise the module route
         working-directory: consumer
-        run: php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class); $response = $kernel->handle(Illuminate\Http\Request::create("/example/health")); exit($response->getStatusCode() === 200 ? 0 : 1);'
+        run: |
+          php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class); $response = $kernel->handle(Illuminate\Http\Request::create("/example/health")); exit($response->getStatusCode() === 200 ? 0 : 1);'
 
       - name: Install verification tooling
         env:
