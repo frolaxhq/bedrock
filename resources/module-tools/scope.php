@@ -232,6 +232,61 @@ if ($argv[1] === 'scope') {
     }
 
     unset($maps['classmap']['Composer\\InstalledVersions']);
+    $privateRoot = realpath($root.'/vendor') ?: throw new RuntimeException('Missing private vendor directory.');
+    $privatePath = static function (string $path) use ($privateRoot): bool {
+        $resolved = realpath($path);
+
+        return $resolved !== false && str_starts_with($resolved, $privateRoot.DIRECTORY_SEPARATOR);
+    };
+
+    // Composer can retain pre-scoping PSR-4 prefixes and skip rewritten classes
+    // during optimization (notably on Windows). Export only declarations found
+    // in the scoped private PHP, without executing any module/vendor code.
+    foreach ($maps['psr4'] as $prefix => $paths) {
+        $paths = array_values(array_filter($paths, static fn (string $path): bool => ! $privatePath($path)));
+
+        if ($paths === []) {
+            unset($maps['psr4'][$prefix]);
+        } else {
+            $maps['psr4'][$prefix] = $paths;
+        }
+    }
+
+    foreach ($maps['classmap'] as $class => $file) {
+        if ($privatePath($file)) {
+            unset($maps['classmap'][$class]);
+        }
+    }
+
+    foreach (runtimeFiles($privateRoot) as $file) {
+        $relativeFile = str_replace('\\', '/', substr($file, strlen($privateRoot) + 1));
+
+        if (! str_ends_with($file, '.php') || str_starts_with($relativeFile, 'composer/')) {
+            continue;
+        }
+
+        $nodes = (new NodeTraverser(new NameResolver))->traverse($parser->parse((string) file_get_contents($file)) ?? []);
+
+        foreach ($finder->findInstanceOf($nodes, Node\Stmt\ClassLike::class) as $node) {
+            if ($node->name === null) {
+                continue;
+            }
+
+            $class = $node->namespacedName?->toString() ?? $node->name->toString();
+
+            if (! str_starts_with($class, 'BedrockPrivate\\')) {
+                throw new RuntimeException('A private dependency class was not scoped.');
+            }
+
+            if (isset($maps['classmap'][$class])) {
+                throw new RuntimeException('The private runtime declares a duplicate class.');
+            }
+
+            $maps['classmap'][$class] = $file;
+        }
+    }
+
+    ksort($maps['classmap']);
     $relative = static function (string $path) use ($root): string {
         $absolute = realpath($path);
 

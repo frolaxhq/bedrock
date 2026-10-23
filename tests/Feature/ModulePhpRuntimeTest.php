@@ -175,16 +175,8 @@ it('installs a locked dist archive with the real composer while ignoring scripts
         app(PhpRuntime::class)->prepare($manifest, $path);
         $maps = app(PhpRuntime::class)->maps($manifest, $path);
 
-        if (PHP_OS_FAMILY === 'Windows' && array_filter(array_keys($maps['classmap']), static fn (string $class): bool => str_starts_with($class, 'BedrockPrivate\\')) === []) {
-            throw new RuntimeException(json_encode([
-                'psr4' => array_keys($maps['psr4']),
-                'classmap' => array_keys($maps['classmap']),
-                'client' => File::exists($path.'/dist/php/vendor/fixture/collision-sdk/src/Client.php')
-                    ? File::get($path.'/dist/php/vendor/fixture/collision-sdk/src/Client.php') : '<missing>',
-            ], JSON_THROW_ON_ERROR));
-        }
-
         expect(array_filter(array_keys($maps['classmap']), static fn (string $class): bool => str_starts_with($class, 'BedrockPrivate\\')))->not->toBeEmpty()
+            ->and($maps['psr4'])->not->toHaveKey('CollisionSdkFixture\\')
             ->and(File::exists($path.'/script-executed'))->toBeFalse()
             ->and(File::exists($path.'/vendor'))->toBeFalse();
     } finally {
@@ -245,15 +237,6 @@ it('scopes two incompatible sdk versions alongside the host using the real isola
         foreach ([[$first, $one], [$second, $two]] as [$manifest, $path]) {
             $runtime->prepare($manifest, $path, true);
             $maps = $runtime->maps($manifest, $path);
-
-            if (PHP_OS_FAMILY === 'Windows' && array_filter($maps['classmap'], static fn (string $file): bool => str_ends_with(str_replace('\\', '/', $file), '/Client.php')) === []) {
-                throw new RuntimeException(json_encode([
-                    'psr4' => array_keys($maps['psr4']),
-                    'classmap' => array_keys($maps['classmap']),
-                    'client' => File::exists($path.'/dist/php/vendor/fixture/collision-sdk/src/Client.php')
-                        ? File::get($path.'/dist/php/vendor/fixture/collision-sdk/src/Client.php') : '<missing>',
-                ], JSON_THROW_ON_ERROR));
-            }
 
             expect(array_filter($maps['classmap'], static fn (string $file): bool => str_ends_with(str_replace('\\', '/', $file), '/Client.php')))->not->toBeEmpty();
 
