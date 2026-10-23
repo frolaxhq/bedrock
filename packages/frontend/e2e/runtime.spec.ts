@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-test('SSR renders, hydrates, and navigates between host and module pages', async ({ page, request }) => {
+test('SSR renders, hydrates, and navigates between host and module pages', async ({
+    page,
+    request,
+}) => {
     const errors: string[] = [];
     page.on('console', (message) => {
         if (message.type() === 'error') errors.push(message.text());
@@ -25,9 +28,15 @@ test('SSR renders, hydrates, and navigates between host and module pages', async
     await expect(page.getByText('Example refreshed.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Collapse navigation' }).click();
-    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute('data-sidebar-collapsed', 'true');
+    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute(
+        'data-sidebar-collapsed',
+        'true',
+    );
     await page.reload();
-    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute('data-sidebar-collapsed', 'true');
+    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute(
+        'data-sidebar-collapsed',
+        'true',
+    );
 
     await page.getByRole('link', { name: 'Return to the host' }).click();
     await expect(page.getByRole('heading', { name: 'Host application' })).toBeVisible();
@@ -51,9 +60,15 @@ test('the panel opens an accessible mobile navigation drawer', async ({ page }) 
     await trigger.click();
 
     await expect(page.locator('#bedrock-panel-mobile-sidebar')).toBeVisible();
-    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute('data-mobile-sidebar-open', 'true');
+    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute(
+        'data-mobile-sidebar-open',
+        'true',
+    );
     await expect(page.getByRole('button', { name: 'Dismiss navigation' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('#bedrock-panel-mobile-sidebar')).toBeHidden();
-    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute('data-mobile-sidebar-open', 'false');
+    await expect(page.locator('[data-slot="panel-shell"]')).toHaveAttribute(
+        'data-mobile-sidebar-open',
+        'false',
+    );
 });

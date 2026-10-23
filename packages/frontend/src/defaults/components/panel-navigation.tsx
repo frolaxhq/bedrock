@@ -41,10 +41,13 @@ export function PanelNavigation({ className, label = 'Primary', ...props }: Pane
             {items.map((item, index) => {
                 const previous = index > 0 ? items[index - 1]! : undefined;
                 const showGroup = item.group !== undefined && item.group !== previous?.group;
-                const declared = item.group === undefined
-                    ? undefined
-                    : navigation.groups.find((candidate) => candidate.key === item.group);
-                const showSeparator = index > 0 && (showGroup || (item.group === undefined && previous?.group !== undefined));
+                const declared =
+                    item.group === undefined
+                        ? undefined
+                        : navigation.groups.find((candidate) => candidate.key === item.group);
+                const showSeparator =
+                    index > 0 &&
+                    (showGroup || (item.group === undefined && previous?.group !== undefined));
 
                 return (
                     <React.Fragment key={item.key}>
@@ -107,7 +110,15 @@ function PanelNavigationLink({ item }: { item: ResolvedNavigationItem }) {
     );
 }
 
-function LinkBody({ item, className, onNavigate }: { item: ResolvedNavigationItem; className?: string; onNavigate?: () => void }) {
+function LinkBody({
+    item,
+    className,
+    onNavigate,
+}: {
+    item: ResolvedNavigationItem;
+    className?: string;
+    onNavigate?: () => void;
+}) {
     const active = item.active && item.href !== undefined;
 
     return (
@@ -145,7 +156,13 @@ function PanelNavigationAction({ item }: { item: ResolvedNavigationItem }) {
     if (sidebarCollapsed && item.icon) {
         return (
             <CollapsedItem label={item.label} badge={item.badge}>
-                <ActionBody item={item} loading={loading} disabled={item.disabled || loading} onClick={activate} className="px-2" />
+                <ActionBody
+                    item={item}
+                    loading={loading}
+                    disabled={item.disabled || loading}
+                    onClick={activate}
+                    className="px-2"
+                />
             </CollapsedItem>
         );
     }
@@ -202,7 +219,13 @@ function PanelNavigationParent({ item }: { item: ResolvedNavigationItem }) {
         if (leaf) {
             return (
                 <CollapsedItem label={item.label} badge={item.badge}>
-                    <PanelNavigationEntry item={{ ...leaf, icon: item.icon ?? leaf.icon, active: childActive && leaf.active }} />
+                    <PanelNavigationEntry
+                        item={{
+                            ...leaf,
+                            icon: item.icon ?? leaf.icon,
+                            active: childActive && leaf.active,
+                        }}
+                    />
                 </CollapsedItem>
             );
         }
@@ -233,20 +256,33 @@ function PanelNavigationParent({ item }: { item: ResolvedNavigationItem }) {
             </CollapsibleTrigger>
             <CollapsibleContent>
                 <ul className="ms-4 grid gap-1 border-s border-sidebar-border py-1 ps-2">
-                    {item.children.filter((child) => child.visible).map((child) => (
-                        <li key={child.key} className="grid">
-                            {child.kind === 'action'
-                                ? <PanelNavigationAction item={child} />
-                                : <PanelNavigationChildLink item={child} onNavigate={() => setMobileSidebarOpen(false)} />}
-                        </li>
-                    ))}
+                    {item.children
+                        .filter((child) => child.visible)
+                        .map((child) => (
+                            <li key={child.key} className="grid">
+                                {child.kind === 'action' ? (
+                                    <PanelNavigationAction item={child} />
+                                ) : (
+                                    <PanelNavigationChildLink
+                                        item={child}
+                                        onNavigate={() => setMobileSidebarOpen(false)}
+                                    />
+                                )}
+                            </li>
+                        ))}
                 </ul>
             </CollapsibleContent>
         </Collapsible>
     );
 }
 
-function PanelNavigationChildLink({ item, onNavigate }: { item: ResolvedNavigationItem; onNavigate: () => void }) {
+function PanelNavigationChildLink({
+    item,
+    onNavigate,
+}: {
+    item: ResolvedNavigationItem;
+    onNavigate: () => void;
+}) {
     const active = item.active && item.href !== undefined;
 
     return (
@@ -282,7 +318,9 @@ function CollapsedItem({
             <TooltipTrigger render={children as React.ReactElement} />
             <TooltipContent side="inline-end" className="flex items-center gap-2">
                 <span>{label}</span>
-                {badge !== null && badge !== undefined && <span className="text-xs text-muted-foreground">{badge}</span>}
+                {badge !== null && badge !== undefined && (
+                    <span className="text-xs text-muted-foreground">{badge}</span>
+                )}
             </TooltipContent>
         </Tooltip>
     );
@@ -300,7 +338,11 @@ function ItemContent({
     return (
         <>
             <span className="grid size-4 shrink-0 place-items-center">
-                {loading ? <Spinner className="size-4" /> : item.icon ? <item.icon aria-hidden="true" className="size-4 shrink-0" /> : null}
+                {loading ? (
+                    <Spinner className="size-4" />
+                ) : item.icon ? (
+                    <item.icon aria-hidden="true" className="size-4 shrink-0" />
+                ) : null}
             </span>
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {badgeFor(item)}

@@ -12,7 +12,9 @@ const clientManifest = join(output, 'client/mf-manifest.json');
 const serverEntry = join(output, 'server/entry.mjs');
 
 if (!existsSync(clientManifest) || !existsSync(serverEntry)) {
-    throw new Error('The client federation manifest and SSR entry must be built before creating the artifact descriptor.');
+    throw new Error(
+        'The client federation manifest and SSR entry must be built before creating the artifact descriptor.',
+    );
 }
 
 const runtime = await import(`${pathToFileURL(serverEntry).href}?bedrock-artifact=${Date.now()}`);
@@ -24,7 +26,11 @@ if (typeof runtime.describeNavigation !== 'function') {
 const navigation = await runtime.describeNavigation();
 const serializedNavigation = JSON.parse(JSON.stringify(navigation));
 
-if (!serializedNavigation || !Array.isArray(serializedNavigation.groups) || !Array.isArray(serializedNavigation.items)) {
+if (
+    !serializedNavigation ||
+    !Array.isArray(serializedNavigation.groups) ||
+    !Array.isArray(serializedNavigation.items)
+) {
     throw new Error('describeNavigation() returned an invalid static navigation descriptor.');
 }
 
@@ -41,12 +47,16 @@ for (const area of ['client', 'server']) {
 }
 
 function isRuntimeArtifact(name) {
-    return !name.startsWith('client/.vite/')
-        && !name.startsWith('client/@mf-types')
-        && name !== 'client/mf-stats.json';
+    return (
+        !name.startsWith('client/.vite/') &&
+        !name.startsWith('client/@mf-types') &&
+        name !== 'client/mf-stats.json'
+    );
 }
 
-const css = Object.keys(files).filter((file) => file.startsWith('client/') && file.endsWith('.css'));
+const css = Object.keys(files).filter(
+    (file) => file.startsWith('client/') && file.endsWith('.css'),
+);
 const descriptor = {
     schema: 1,
     module: manifest.key,

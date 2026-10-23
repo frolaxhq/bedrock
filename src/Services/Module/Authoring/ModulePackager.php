@@ -8,6 +8,7 @@ use FilesystemIterator;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleArchiveException;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
 use Frolax\Bedrock\Services\Module\Install\ZipSource;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 use Illuminate\Filesystem\Filesystem;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -24,7 +25,7 @@ class ModulePackager
         protected string $manifestFile = 'module.json',
     ) {}
 
-    public function pack(string $source, string $outputDirectory, bool $force = false): string
+    public function pack(string $source, string $outputDirectory, bool $force = false, bool $withoutPhpRuntime = false): string
     {
         $source = realpath($source) ?: $source;
         $manifest = $this->validator->manifest($source);
@@ -44,6 +45,14 @@ class ModulePackager
 
         try {
             $this->copyPackage($source, $staging, $this->ignorePatterns($source), $archivePath);
+
+            // Bundled raw vendor may be used to build, but never distributed by default.
+            if (! $withoutPhpRuntime) {
+                app(PhpRuntime::class)->prepare($manifest, $staging, (bool) config('bedrock.modules.php.offline', false));
+            } else {
+                $this->files->deleteDirectory($staging.'/dist/php');
+            }
+            $this->files->deleteDirectory($staging.'/vendor');
             $this->validator->validate($staging);
             $this->writeArchive($staging, $archivePath);
             $this->validateArchive($archivePath);
@@ -139,7 +148,7 @@ class ModulePackager
     /** @return list<string> */
     protected function ignorePatterns(string $source): array
     {
-        $patterns = ['.git', '.git/**', 'node_modules', 'node_modules/**', '.DS_Store', '*.log'];
+        $patterns = ['.git', '.git/**', 'node_modules', 'node_modules/**', '.DS_Store', '*.log', '.env', '.env.*', 'auth.json'];
         $path = $source.'/.bedrockignore';
 
         if (! $this->files->isFile($path)) {

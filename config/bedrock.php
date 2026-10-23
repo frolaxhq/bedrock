@@ -43,10 +43,24 @@ return [
             'max_path_length' => 240,
         ],
 
+        'php' => [
+            'composer' => ['composer'],
+            'timeout' => 300,
+            'offline' => false,
+            'toolchain_path' => 'storage/framework/bedrock/module-tools',
+            'repositories' => [],
+        ],
+
+        'operations' => [
+            'connection' => null,
+            'queue' => 'bedrock-install',
+            'timeout' => 1200,
+        ],
+
         'locks' => [
             'store' => null,
             'prefix' => 'modules.operations',
-            'seconds' => 30,
+            'seconds' => 1500,
             'wait' => 5,
         ],
 
@@ -134,6 +148,10 @@ return [
         'admin_permission' => 'bedrock.admin',
         'admin_role' => 'bedrock-admin',
         'user_provider' => 'users',
+    ],
+
+    'administration' => [
+        'enabled' => false,
     ],
 
     /*

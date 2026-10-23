@@ -17,10 +17,9 @@ export function AppLayout({ children, ...props }: AppLayoutProps) {
 
     return (
         <>
-            <Head title={props.title}/>
+            <Head title={props.title} />
 
-            <NavigationProvider
-                value={bedrock?.runtimeNavigation ?? bedrock?.resolvedNavigation}>
+            <NavigationProvider value={bedrock?.runtimeNavigation ?? bedrock?.resolvedNavigation}>
                 <PanelProvider
                     panel={bedrock?.viewer?.panel}
                     navigation={bedrock?.navigation ?? []}

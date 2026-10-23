@@ -36,7 +36,12 @@ function store(): OverrideStore {
     const target = globalThis as typeof globalThis & { [storeKey]?: OverrideStore };
 
     if (!target[storeKey]) {
-        target[storeKey] = { modules: new Map(), panels: new Map(), listeners: new Set(), version: 0 };
+        target[storeKey] = {
+            modules: new Map(),
+            panels: new Map(),
+            listeners: new Set(),
+            version: 0,
+        };
     }
 
     return target[storeKey];
@@ -113,9 +118,15 @@ export function useFrontendPanel(requested: string): ResolvedFrontendPanel {
     return resolveFrontendPanel(requested);
 }
 
-export function createOverridableComponent<T extends ElementType>(id: string, name: string, fallback: T): T {
+export function createOverridableComponent<T extends ElementType>(
+    id: string,
+    name: string,
+    fallback: T,
+): T {
     const Overridable = forwardRef<unknown, Record<string, unknown>>((props, ref) => {
-        const Component = useFrontendExport(id, name, fallback) as ComponentType<Record<string, unknown>>;
+        const Component = useFrontendExport(id, name, fallback) as ComponentType<
+            Record<string, unknown>
+        >;
 
         return createElement(Component, { ...props, ref });
     });

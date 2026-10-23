@@ -7,6 +7,21 @@ export interface ErrorStateProps extends Omit<React.HTMLAttributes<HTMLDivElemen
     action?: React.ReactNode;
 }
 
-export function ErrorState({ title = 'Something went wrong', error, action, ...props }: ErrorStateProps) {
-    return <Alert variant="destructive" {...props}><AlertTitle>{title}</AlertTitle>{error && <AlertDescription>{typeof error === 'string' ? error : error.message}</AlertDescription>}{action}</Alert>;
+export function ErrorState({
+    title = 'Something went wrong',
+    error,
+    action,
+    ...props
+}: ErrorStateProps) {
+    return (
+        <Alert variant="destructive" {...props}>
+            <AlertTitle>{title}</AlertTitle>
+            {error && (
+                <AlertDescription>
+                    {typeof error === 'string' ? error : error.message}
+                </AlertDescription>
+            )}
+            {action}
+        </Alert>
+    );
 }

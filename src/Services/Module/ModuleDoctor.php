@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Services\Module;
 
-use Frolax\Bedrock\Contracts\Frontend\FrontendAssetManager;
 use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\Contracts\Module\ModuleDiagnostics;
 use Frolax\Bedrock\Contracts\Module\ModuleDiscoverer;
 use Frolax\Bedrock\Contracts\Module\ModuleOperationLock;
 use Frolax\Bedrock\Contracts\Module\ModuleRepository;
-use Frolax\Bedrock\Contracts\Permissions\ModulePermissions;
 use Frolax\Bedrock\DataObjects\Module\DiagnosticCheck;
 use Frolax\Bedrock\DataObjects\Module\DiagnosticReport;
 use Frolax\Bedrock\DataObjects\Module\DiscoveredModule;
@@ -19,10 +17,11 @@ use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Enums\Module\DiagnosticStatus;
 use Frolax\Bedrock\Enums\Module\ModuleStatus;
 use Frolax\Bedrock\Exceptions\Module\CircularDependencyException;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 use Frolax\Bedrock\Support\Module\ModulePath;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Facades\Route;
+use Symfony\Component\Process\ExecutableFinder;
 use Throwable;
 
 class ModuleDoctor implements ModuleDiagnostics
@@ -38,8 +37,7 @@ class ModuleDoctor implements ModuleDiagnostics
         protected DependencyGuard $dependencies,
         protected DependencyResolver $resolver,
         protected Filesystem $files,
-        protected FrontendAssetManager $frontend,
-        protected ModulePermissions $permissions,
+        protected ModuleFeatureHandlers $features,
     ) {}
 
     public function diagnose(?string $key = null): DiagnosticReport
@@ -81,6 +79,25 @@ class ModuleDoctor implements ModuleDiagnostics
                 continue;
             }
 
+            if (is_file($discovered->path.'/composer.json')) {
+                try {
+                    $this->app->make(PhpRuntime::class)->validate($discovered->manifest, $discovered->path, true);
+                    $checks[] = $this->check('php.runtime', DiagnosticStatus::Passed, $discovered->key, 'The isolated PHP runtime and locked dependencies are ready.');
+                } catch (Throwable $exception) {
+                    $checks[] = $this->check('php.runtime', DiagnosticStatus::Failed, $discovered->key, $exception->getMessage());
+                    $command = $this->app->make('config')->get('bedrock.modules.php.composer', ['composer']);
+                    $executable = is_array($command) ? ($command[0] ?? '') : '';
+                    $found = is_string($executable) && $executable !== '' && ((new ExecutableFinder)->find($executable) !== null || is_file($executable));
+                    $checks[] = $this->check('php.composer', $found ? DiagnosticStatus::Passed : DiagnosticStatus::Warning, $discovered->key,
+                        $found ? 'The configured Composer executable is available for preparation.' : 'Configure bedrock.modules.php.composer or supply a ready-built runtime ZIP.');
+                    $connection = config('bedrock.modules.operations.connection') ?? config('queue.default');
+                    $driver = is_string($connection) ? config('queue.connections.'.$connection.'.driver') : null;
+                    $async = is_string($driver) && ! in_array($driver, ['sync', 'null', 'deferred', 'background', 'failover'], true);
+                    $checks[] = $this->check('php.installation_queue', $async ? DiagnosticStatus::Passed : DiagnosticStatus::Warning, $discovered->key,
+                        $async ? 'The installation queue is asynchronous; ensure its dedicated worker is running.' : 'Admin installation needs an asynchronous connection and a bedrock-install worker.');
+                }
+            }
+
             $failures = $this->autoloader->failures($discovered->manifest, $discovered->path);
             $checks[] = $this->check(
                 'autoload.paths',
@@ -107,17 +124,11 @@ class ModuleDoctor implements ModuleDiagnostics
             }
 
             $registered = $this->repository->find($discovered->key);
-            $frontend = $this->frontend->failures(
+            $checks = [...$checks, ...$this->features->diagnostics(
                 $discovered->manifest,
                 $discovered->path,
                 $registered !== null && $registered->status !== ModuleStatus::Discovered,
-            );
-            $checks[] = $this->check(
-                'frontend.artifact',
-                $frontend === [] ? DiagnosticStatus::Passed : DiagnosticStatus::Failed,
-                $discovered->key,
-                $frontend[0] ?? 'Frontend artifacts are complete and pass integrity checks.',
-            );
+            )];
 
             $core = $this->core->reason($discovered->manifest);
             $checks[] = $this->check(
@@ -146,40 +157,6 @@ class ModuleDoctor implements ModuleDiagnostics
 
             if (isset($cycles[$discovered->key])) {
                 $checks[] = $this->check('dependency.cycle', DiagnosticStatus::Failed, $discovered->key, $cycles[$discovered->key]);
-            }
-
-            if ($frontend === []) {
-                $navigation = $this->frontend->navigation($discovered->manifest, $discovered->path);
-
-                foreach ($this->navigationItems($navigation['items']) as $item) {
-                    $route = $item['route'] ?? null;
-
-                    if (is_string($route) && $route !== '') {
-                        $checks[] = $this->check(
-                            'navigation.route',
-                            Route::has($route) ? DiagnosticStatus::Passed : DiagnosticStatus::Failed,
-                            $discovered->key,
-                            Route::has($route) ? sprintf('Navigation route [%s] resolves.', $route) : sprintf('Navigation route [%s] does not exist.', $route),
-                        );
-                    }
-
-                    $permission = $item['permission'] ?? null;
-
-                    if (is_string($permission) && $permission !== '') {
-                        $name = str_contains($permission, '.') ? $permission : $this->permissions->name($discovered->key, $permission);
-                        $declared = collect($discovered->manifest->permissions)->contains(function (mixed $definition) use ($discovered, $name): bool {
-                            $key = is_string($definition) ? $definition : $definition['key'] ?? null;
-
-                            return is_string($key) && $name === $this->permissions->name($discovered->key, $key);
-                        });
-                        $checks[] = $this->check(
-                            'navigation.permission',
-                            $declared ? DiagnosticStatus::Passed : DiagnosticStatus::Failed,
-                            $discovered->key,
-                            $declared ? sprintf('Navigation permission [%s] is declared.', $name) : sprintf('Navigation permission [%s] is not declared by this module.', $name),
-                        );
-                    }
-                }
             }
 
             if ($registered === null) {
@@ -211,26 +188,6 @@ class ModuleDoctor implements ModuleDiagnostics
         $ok = ! collect($checks)->contains(static fn (DiagnosticCheck $check): bool => $check->status === DiagnosticStatus::Failed);
 
         return new DiagnosticReport($ok, $checks);
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $items
-     * @return list<array<string, mixed>>
-     */
-    protected function navigationItems(array $items): array
-    {
-        $flattened = [];
-
-        foreach ($items as $item) {
-            $flattened[] = $item;
-            $children = $item['children'] ?? [];
-
-            if (is_array($children)) {
-                $flattened = [...$flattened, ...$this->navigationItems(array_values(array_filter($children, 'is_array')))];
-            }
-        }
-
-        return $flattened;
     }
 
     protected function check(string $code, DiagnosticStatus $status, ?string $module, string $message): DiagnosticCheck

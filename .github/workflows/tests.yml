@@ -26,12 +26,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: '24'
+          node-version-file: .node-version
 
       - name: Enable pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.19.0 --activate
+          corepack prepare pnpm@10.34.6 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -39,17 +39,17 @@ jobs:
       - name: Type check and unit tests
         run: |
           pnpm frontend:generate:check
-          pnpm frontend:check
+          pnpm frontend:build
+          pnpm exec vp check
           pnpm frontend:test
 
-      - name: Build and validate npm package
+      - name: Validate npm package
         run: |
-          pnpm frontend:build
           pnpm frontend:pack
 
       - name: Build the canonical module
         run: |
-          pnpm --filter @modules/example types
+          pnpm --filter @modules/example check
           pnpm --filter @modules/example build
 
       - name: Browser SSR and navigation
@@ -57,6 +57,8 @@ jobs:
 
   tests:
     runs-on: ${{ matrix.os }}
+    env:
+      COMPOSER_ROOT_VERSION: 1.0.x-dev
 
     strategy:
       fail-fast: true
@@ -93,6 +95,9 @@ jobs:
       - name: PHPStan
         run: composer analyse
 
+      - name: Install isolated module build tools
+        run: composer install --working-dir=resources/module-tools --no-dev --no-scripts --no-plugins --prefer-dist --no-interaction --no-progress
+
       - name: Linter
         run: composer lint:check
 
@@ -124,14 +129,28 @@ jobs:
           tools: composer:v2
           coverage: none
 
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .node-version
+
+      - name: Build example module artifacts
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.6 --activate
+          pnpm install --frozen-lockfile
+          pnpm frontend:build
+          pnpm --filter @modules/example build
+
       - name: Create Laravel consumer
         run: composer create-project laravel/laravel consumer "^13.0" --no-interaction --prefer-dist
 
       - name: Install Bedrock from the checkout
         working-directory: consumer
         run: |
-          composer config repositories.bedrock path ..
-          composer require frolaxhq/bedrock:@dev --with-all-dependencies --no-interaction
+          composer config repositories.bedrock '{"type":"path","url":"..","options":{"versions":{"frolaxhq/bedrock":"1.0.0"}}}'
+          composer config repositories.bedrock-platform '{"type":"path","url":"../packages/php/*","options":{"versions":{"frolaxhq/bedrock-admin":"1.0.0","frolaxhq/bedrock-frontend":"1.0.0","frolaxhq/bedrock-access-spatie":"1.0.0"}}}'
+          composer require frolaxhq/bedrock:^1.0 frolaxhq/bedrock-admin:^1.0 frolaxhq/bedrock-frontend:^1.0 --with-all-dependencies --no-interaction
 
       - name: Prepare local administration
         working-directory: consumer
@@ -160,3 +179,11 @@ jobs:
       - name: Exercise the module route
         working-directory: consumer
         run: php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class); $response = $kernel->handle(Illuminate\Http\Request::create("/example/health")); exit($response->getStatusCode() === 200 ? 0 : 1);'
+
+      - name: Install verification tooling
+        env:
+          COMPOSER_ROOT_VERSION: 1.0.x-dev
+        run: composer install --no-interaction --prefer-dist --no-scripts
+
+      - name: Verify optional platform combinations
+        run: composer test:consumer

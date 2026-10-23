@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vite-plus/test';
 import { ThemeProvider, useDefaultTheme } from '../../src/ui/theme/index.js';
 
 function ThemeProbe() {
@@ -18,17 +18,19 @@ function ThemeProbe() {
 
 describe('Bedrock theme foundation', () => {
     beforeAll(() => {
-        vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
-            matches: false,
-            media: query,
-            onchange: null,
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-            addListener: vi.fn(),
-            removeListener: vi.fn(),
-            dispatchEvent: vi.fn(),
-        })));
-        window.matchMedia = globalThis.matchMedia;
+        vi.stubGlobal(
+            'matchMedia',
+            vi.fn((query: string) => ({
+                matches: false,
+                media: query,
+                onchange: null,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+                addListener: vi.fn(),
+                removeListener: vi.fn(),
+                dispatchEvent: vi.fn(),
+            })),
+        );
     });
 
     it('provides Base UI with an explicit RTL direction', () => {

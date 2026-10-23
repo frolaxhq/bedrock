@@ -22,7 +22,9 @@ import type { BedrockFrontendModule, BedrockNavigationItem, BedrockPage } from '
 export type { NavigationContext } from '../module/index.js';
 
 export interface NavigationRuntime {
-    resolveNavigation(context: NavigationContext): Promise<NavigationResolution> | NavigationResolution;
+    resolveNavigation(
+        context: NavigationContext,
+    ): Promise<NavigationResolution> | NavigationResolution;
     runNavigationAction(key: string, context: NavigationContext): Promise<void> | void;
     materializeNavigation?(): Promise<NavigationDefinitionValue>;
 }
@@ -132,7 +134,9 @@ export async function runNavigationAction(key: string): Promise<void> {
     try {
         await action.runtime.runNavigationAction(action.key, action.context);
     } catch (error) {
-        action.context.notify.error(error instanceof Error ? error.message : 'The navigation action failed.');
+        action.context.notify.error(
+            error instanceof Error ? error.message : 'The navigation action failed.',
+        );
         throw error;
     } finally {
         current.loading.delete(key);
@@ -153,7 +157,9 @@ export async function prepareNavigation(
     const browser = typeof window !== 'undefined';
 
     if (browser) {
-        store().pending?.controller.abort(new Error('A newer navigation replaced this resolution.'));
+        store().pending?.controller.abort(
+            new Error('A newer navigation replaced this resolution.'),
+        );
     }
 
     if (shared.resolvedNavigation) {
@@ -163,7 +169,10 @@ export async function prepareNavigation(
     const controller = new AbortController();
     if (browser) store().pending = { controller };
     const timeout = Math.max(1, options.timeout ?? 2_000);
-    const timer = setTimeout(() => controller.abort(new Error(`Navigation resolution exceeded ${timeout}ms.`)), timeout);
+    const timer = setTimeout(
+        () => controller.abort(new Error(`Navigation resolution exceeded ${timeout}ms.`)),
+        timeout,
+    );
     const notifier = createNotifier(options.notify);
     const actions = new Map<string, BoundAction>();
 
@@ -209,12 +218,17 @@ export async function prepareNavigation(
                 resolutions.push(resolution);
                 bindActions(actions, resolution.items, runtime, context, key);
             } catch (error) {
-                if (controller.signal.aborted && controller.signal.reason instanceof Error
-                    && controller.signal.reason.message.includes('newer navigation')) {
+                if (
+                    controller.signal.aborted &&
+                    controller.signal.reason instanceof Error &&
+                    controller.signal.reason.message.includes('newer navigation')
+                ) {
                     throw controller.signal.reason;
                 }
                 if (options.strict) throw error;
-                resolutions.push(staticResolution(key, envelope, shared.modules[key]?.navigation.groups ?? []));
+                resolutions.push(
+                    staticResolution(key, envelope, shared.modules[key]?.navigation.groups ?? []),
+                );
             }
         }
 
@@ -222,8 +236,11 @@ export async function prepareNavigation(
         if (browser) store().actions = actions;
         return complete(page, resolution);
     } catch (error) {
-        if (controller.signal.aborted && controller.signal.reason instanceof Error
-            && controller.signal.reason.message.includes('newer navigation')) {
+        if (
+            controller.signal.aborted &&
+            controller.signal.reason instanceof Error &&
+            controller.signal.reason.message.includes('newer navigation')
+        ) {
             throw controller.signal.reason;
         }
         if (options.strict) throw error;
@@ -272,14 +289,25 @@ async function rebind(
             try {
                 const value = await materializeNavigation(host);
                 collectIcons('host', value.items, icons);
-                bindDefinitionActions(actions, 'host', value.items, runtime, context, snapshotKeys(snapshot.items, undefined));
+                bindDefinitionActions(
+                    actions,
+                    'host',
+                    value.items,
+                    runtime,
+                    context,
+                    snapshotKeys(snapshot.items, undefined),
+                );
                 local.push(filterHost(staticDefinitions(value), context));
             } catch (error) {
                 if (options.strict) throw error;
             }
         }
 
-        const modules = new Set(snapshot.items.map((item) => item.module).filter((module): module is string => Boolean(module)));
+        const modules = new Set(
+            snapshot.items
+                .map((item) => item.module)
+                .filter((module): module is string => Boolean(module)),
+        );
 
         for (const key of modules) {
             const context = contextFor('module', key, page, controller.signal, notifier);
@@ -291,7 +319,14 @@ async function rebind(
 
                 const value = await runtime.materializeNavigation();
                 collectIcons(key, value.items, icons);
-                bindDefinitionActions(actions, key, value.items, runtime, context, snapshotKeys(snapshot.items, key));
+                bindDefinitionActions(
+                    actions,
+                    key,
+                    value.items,
+                    runtime,
+                    context,
+                    snapshotKeys(snapshot.items, key),
+                );
             } catch (error) {
                 if (options.strict) throw error;
             }
@@ -300,9 +335,11 @@ async function rebind(
         if (typeof window !== 'undefined') store().actions = actions;
 
         const rebound = attachIcons(snapshot, icons);
-        const existing = new Set(flatten(rebound.items)
-            .filter((item) => item.module === undefined)
-            .map((item) => item.key));
+        const existing = new Set(
+            flatten(rebound.items)
+                .filter((item) => item.module === undefined)
+                .map((item) => item.key),
+        );
         const hostOnly = local.map((resolution) => ({
             ...resolution,
             items: resolution.items.filter((item) => !existing.has(item.key)),
@@ -334,7 +371,11 @@ function snapshotKeys(items: ResolvedNavigationItem[], module: string | undefine
     return keys;
 }
 
-function collectIcons(namespace: string, items: NavigationItemDefinition[], icons: Map<string, NavigationIcon>): void {
+function collectIcons(
+    namespace: string,
+    items: NavigationItemDefinition[],
+    icons: Map<string, NavigationIcon>,
+): void {
     for (const item of items) {
         if (item.icon) icons.set(`${namespace}:${item.key}`, item.icon);
         if (item.children) collectIcons(namespace, item.children, icons);
@@ -354,11 +395,15 @@ function bindDefinitionActions(
             actions.set(`${namespace}:${item.key}`, { runtime, context, key: item.key });
         }
 
-        if (item.children) bindDefinitionActions(actions, namespace, item.children, runtime, context, allowed);
+        if (item.children)
+            bindDefinitionActions(actions, namespace, item.children, runtime, context, allowed);
     }
 }
 
-function attachIcons(resolution: NavigationResolution, icons: Map<string, NavigationIcon>): NavigationResolution {
+function attachIcons(
+    resolution: NavigationResolution,
+    icons: Map<string, NavigationIcon>,
+): NavigationResolution {
     const visit = (item: ResolvedNavigationItem): ResolvedNavigationItem => ({
         ...item,
         loading: false,
@@ -386,7 +431,10 @@ function contextFor(
         panel: viewer?.panel ?? 'default',
         signal,
         can(permission) {
-            const name = side === 'module' && module && !permission.includes('.') ? `${module}.${permission}` : permission;
+            const name =
+                side === 'module' && module && !permission.includes('.')
+                    ? `${module}.${permission}`
+                    : permission;
 
             return viewer?.permissions.includes(name) ?? false;
         },
@@ -398,7 +446,12 @@ function contextFor(
  * Reject when a promise settles later than the deadline so a resolver that
  * ignores its abort signal cannot stall navigation preparation.
  */
-function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string, signal: AbortSignal): Promise<T> {
+function withTimeout<T>(
+    promise: Promise<T>,
+    milliseconds: number,
+    message: string,
+    signal: AbortSignal,
+): Promise<T> {
     return new Promise<T>((resolve, reject) => {
         let timer: ReturnType<typeof setTimeout>;
         const finish = (callback: () => void) => {
@@ -406,9 +459,14 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: stri
             signal.removeEventListener('abort', aborted);
             callback();
         };
-        const aborted = () => finish(() => reject(
-            signal.reason instanceof Error ? signal.reason : new Error('Navigation resolution was aborted.'),
-        ));
+        const aborted = () =>
+            finish(() =>
+                reject(
+                    signal.reason instanceof Error
+                        ? signal.reason
+                        : new Error('Navigation resolution was aborted.'),
+                ),
+            );
         timer = setTimeout(() => finish(() => reject(new Error(message))), milliseconds);
 
         signal.addEventListener('abort', aborted, { once: true });
@@ -417,20 +475,28 @@ function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: stri
 
         promise.then(
             (value) => finish(() => resolve(value)),
-            (error) => finish(() => reject(error instanceof Error ? error : new Error(String(error)))),
+            (error) =>
+                finish(() => reject(error instanceof Error ? error : new Error(String(error)))),
         );
     });
 }
 
 function staticDefinitions(value: NavigationDefinitionValue): NavigationResolution {
-    const convert = (item: NavigationItemDefinition, parent?: NavigationItemDefinition): ResolvedNavigationItem => ({
+    const convert = (
+        item: NavigationItemDefinition,
+        parent?: NavigationItemDefinition,
+    ): ResolvedNavigationItem => ({
         key: item.key,
         kind: item.kind,
         label: item.label,
         ...(item.kind === 'link' && item.route ? { route: item.route } : {}),
-        ...(item.kind === 'link' && item.href ? { href: typeof item.href === 'string' ? item.href : item.href.url } : {}),
-        ...(item.group ?? parent?.group ? { group: item.group ?? parent?.group } : {}),
-        ...(item.permission ?? parent?.permission ? { permission: item.permission ?? parent?.permission } : {}),
+        ...(item.kind === 'link' && item.href
+            ? { href: typeof item.href === 'string' ? item.href : item.href.url }
+            : {}),
+        ...((item.group ?? parent?.group) ? { group: item.group ?? parent?.group } : {}),
+        ...((item.permission ?? parent?.permission)
+            ? { permission: item.permission ?? parent?.permission }
+            : {}),
         panels: item.panels ?? parent?.panels ?? [],
         active: false,
         order: item.order ?? 0,
@@ -448,15 +514,28 @@ function staticDefinitions(value: NavigationDefinitionValue): NavigationResoluti
     };
 }
 
-function filterHost(resolution: NavigationResolution, context: NavigationContext): NavigationResolution {
+function filterHost(
+    resolution: NavigationResolution,
+    context: NavigationContext,
+): NavigationResolution {
     const filter = (item: ResolvedNavigationItem): ResolvedNavigationItem | null => {
         if (item.panels.length > 0 && !item.panels.includes(context.panel)) return null;
         if (item.permission && !context.can(item.permission)) return null;
 
-        return { ...item, children: item.children.map(filter).filter((child): child is ResolvedNavigationItem => child !== null) };
+        return {
+            ...item,
+            children: item.children
+                .map(filter)
+                .filter((child): child is ResolvedNavigationItem => child !== null),
+        };
     };
 
-    return { ...resolution, items: resolution.items.map(filter).filter((item): item is ResolvedNavigationItem => item !== null) };
+    return {
+        ...resolution,
+        items: resolution.items
+            .map(filter)
+            .filter((item): item is ResolvedNavigationItem => item !== null),
+    };
 }
 
 function enforceEnvelope(
@@ -538,7 +617,11 @@ function staticFallback(
     const groups: NavigationResolution['groups'] = [];
 
     for (const [module, entries] of byModule) {
-        const resolved = staticResolution(module, entries, modules[module]?.navigation.groups ?? []);
+        const resolved = staticResolution(
+            module,
+            entries,
+            modules[module]?.navigation.groups ?? [],
+        );
         items.push(...resolved.items);
         groups.push(...resolved.groups);
     }
@@ -547,11 +630,19 @@ function staticFallback(
 }
 
 function merge(resolutions: NavigationResolution[]): NavigationResolution {
-    const groups = new Map(resolutions.flatMap((resolution) => resolution.groups).map((group) => [group.key, group]));
+    const groups = new Map(
+        resolutions.flatMap((resolution) => resolution.groups).map((group) => [group.key, group]),
+    );
 
     return {
-        groups: [...groups.values()].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label)),
-        items: resolutions.flatMap((resolution) => resolution.items).sort((left, right) => left.order - right.order || left.label.localeCompare(right.label)),
+        groups: [...groups.values()].sort(
+            (left, right) => left.order - right.order || left.label.localeCompare(right.label),
+        ),
+        items: resolutions
+            .flatMap((resolution) => resolution.items)
+            .sort(
+                (left, right) => left.order - right.order || left.label.localeCompare(right.label),
+            ),
     };
 }
 
@@ -563,7 +654,8 @@ function bindActions(
     namespace: string,
 ): void {
     for (const item of flatten(items)) {
-        if (item.kind === 'action') actions.set(`${namespace}:${item.key}`, { runtime, context, key: item.key });
+        if (item.kind === 'action')
+            actions.set(`${namespace}:${item.key}`, { runtime, context, key: item.key });
     }
 }
 
@@ -578,10 +670,12 @@ function serializable(resolution: NavigationResolution): NavigationResolution {
         return { ...safe, children: value.children.map(item) };
     };
 
-    return JSON.parse(JSON.stringify({
-        groups: resolution.groups,
-        items: resolution.items.map(item),
-    })) as NavigationResolution;
+    return JSON.parse(
+        JSON.stringify({
+            groups: resolution.groups,
+            items: resolution.items.map(item),
+        }),
+    ) as NavigationResolution;
 }
 
 function complete(page: BedrockPage, resolution: NavigationResolution): NavigationResolution {
@@ -621,7 +715,9 @@ function updateLoading(key: string, loading: boolean): void {
 function createNotifier(overrides?: Partial<NavigationNotifier>): NavigationNotifier {
     const dispatch = (type: 'success' | 'error', message: string) => {
         if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('bedrock:navigation-notification', { detail: { type, message } }));
+            window.dispatchEvent(
+                new CustomEvent('bedrock:navigation-notification', { detail: { type, message } }),
+            );
         }
     };
 

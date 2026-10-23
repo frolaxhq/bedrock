@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vite-plus/test';
 import {
     createOverridableComponent,
     createOverridableFunction,
@@ -22,13 +22,17 @@ describe('frontend overrides', () => {
     it('uses the package default until a matching host module is registered', () => {
         const Button = createOverridableComponent('components/ui/button', 'Button', DefaultButton);
 
-        expect(renderToStaticMarkup(createElement(Button, null, 'Save'))).toContain('data-source="default"');
+        expect(renderToStaticMarkup(createElement(Button, null, 'Save'))).toContain(
+            'data-source="default"',
+        );
 
         registerFrontendOverrides({
             'components/ui/button': { Button: HostButton },
         });
 
-        expect(renderToStaticMarkup(createElement(Button, null, 'Save'))).toContain('data-source="host"');
+        expect(renderToStaticMarkup(createElement(Button, null, 'Save'))).toContain(
+            'data-source="host"',
+        );
     });
 
     it('ignores exports registered under a different exact path', () => {
@@ -37,7 +41,9 @@ describe('frontend overrides', () => {
             'components/button': { Button: HostButton },
         });
 
-        expect(renderToStaticMarkup(createElement(Button, null, 'Save'))).toContain('data-source="default"');
+        expect(renderToStaticMarkup(createElement(Button, null, 'Save'))).toContain(
+            'data-source="default"',
+        );
     });
 
     it('preserves methods on callable exports while resolving overrides', () => {

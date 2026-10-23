@@ -6,6 +6,7 @@ namespace Frolax\Bedrock\Services\Module\Install;
 
 use Frolax\Bedrock\DataObjects\Module\DiscoveredModule;
 use Frolax\Bedrock\Exceptions\Module\ModuleDatabaseException;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Filesystem\Filesystem;
 use Throwable;
@@ -33,6 +34,8 @@ class DatabaseModuleRunner
      */
     public function run(DiscoveredModule $module): void
     {
+        $module = new DiscoveredModule($module->key, app(PhpRuntime::class)->root($module->manifest, $module->path), $module->manifest);
+
         if ($this->runsMigrations($module)) {
             $this->migrate($module);
         }

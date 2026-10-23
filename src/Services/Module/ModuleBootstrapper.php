@@ -29,6 +29,7 @@ class ModuleBootstrapper
         protected ComposerRequirementChecker $composer,
         protected ModuleAutoloader $autoloader,
         protected ModuleHealthManager $health,
+        protected ModuleFeatureHandlers $features,
     ) {}
 
     /**
@@ -75,6 +76,7 @@ class ModuleBootstrapper
         try {
             $this->core->ensureSatisfied($module->toManifest());
             $this->composer->ensureSatisfied($module->toManifest());
+            $this->features->ensureSupported($module->toManifest());
             $this->autoloader->register($module->toManifest(), (string) $module->path, true);
             $this->guard->ensureSatisfied($module->toManifest());
         } catch (Throwable $exception) {

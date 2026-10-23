@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 
 const root = process.cwd();
 
@@ -22,7 +22,9 @@ describe('frontend source generation', () => {
         expect(generated).toContain("component('layouts/app-layout', 'AppLayout'");
         expect(generated).toContain("component('layouts/auth-layout', 'AuthLayout'");
         expect(generated).not.toContain('PanelLayout');
-        expect(generated).toContain("createOverridableFunction('components/ui/button', 'buttonVariants'");
+        expect(generated).toContain(
+            "createOverridableFunction('components/ui/button', 'buttonVariants'",
+        );
     });
 });
 

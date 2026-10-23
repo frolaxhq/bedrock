@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Services\Module\Authoring;
 
+use Frolax\Bedrock\Contracts\Module\ModuleFrontendScaffold;
 use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
+use Frolax\Bedrock\Services\Module\Php\DependencyManifest;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use stdClass;
 use Throwable;
 
 class ModuleScaffolder
@@ -15,9 +18,10 @@ class ModuleScaffolder
     public function __construct(
         protected Filesystem $files,
         protected string $modulesPath,
+        protected ?ModuleFrontendScaffold $frontend = null,
     ) {}
 
-    public function create(string $key, ?string $name = null, bool $backendOnly = false): string
+    public function create(string $key, ?string $name = null, bool $backendOnly = true): string
     {
         if (preg_match(Manifest::KEY_PATTERN, $key) !== 1) {
             throw new InvalidModuleSourceException(sprintf('The module key [%s] is invalid.', $key));
@@ -68,25 +72,11 @@ class ModuleScaffolder
             'composer' => ['require' => ['php' => '^8.5', 'laravel/framework' => '^13.0']],
         ];
 
-        if (! $backendOnly) {
-            $manifest['frontend'] = [
-                'driver' => 'inertia-react',
-                'pages' => 'resources/js/pages',
-                'artifact' => 'dist/bedrock/frontend.json',
-                'requires' => [
-                    'react' => '^19.0',
-                    'react-dom' => '^19.0',
-                    '@inertiajs/react' => '^3.0',
-                    '@frolax/bedrock' => '^1.0',
-                ],
-            ];
-        }
-
         $files = [
             'module.json' => json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL,
             'src/'.$class.'ServiceProvider.php' => $this->stub('ModuleServiceProvider.php', compact('key', 'class')),
             'src/Http/Controllers/'.$class.'Controller.php' => $this->stub(
-                $backendOnly ? 'BackendController.php' : 'FrontendController.php',
+                'BackendController.php',
                 compact('key', 'class'),
             ),
             'routes/web.php' => $this->stub('routes.php', compact('key', 'class')),
@@ -94,18 +84,37 @@ class ModuleScaffolder
             '.bedrockignore' => ".git\nnode_modules\n.DS_Store\n*.log\ndist/bedrock/client/.vite\ndist/bedrock/client/@mf-types*\ndist/bedrock/client/mf-stats.json\n",
         ];
 
+        $composer = [
+            'name' => 'bedrock-modules/'.$key,
+            'type' => 'library',
+            'require' => ['php' => '^8.5'],
+            'autoload' => $manifest['autoload'],
+            'config' => ['allow-plugins' => false, 'sort-packages' => true],
+        ];
+        $lock = [
+            '_readme' => ['This file locks this module’s private dependencies.'],
+            'content-hash' => (new DependencyManifest)->contentHash($composer),
+            'packages' => [], 'packages-dev' => [], 'aliases' => [],
+            'minimum-stability' => 'stable', 'stability-flags' => new stdClass,
+            'prefer-stable' => false, 'prefer-lowest' => false,
+            'platform' => ['php' => '^8.5'], 'platform-dev' => new stdClass,
+            'plugin-api-version' => '2.6.0',
+        ];
+        foreach (['composer.json' => $composer, 'composer.lock' => $lock] as $file => $data) {
+            $files[$file] = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+        }
+        $files['.gitignore'] = "/vendor/\n/dist/\n";
+        $files['README.md'] = "# {$name}\n\nPrivate SDKs belong in this module's composer.json. Host integrations remain in module.json composer.require.\n\nRun composer update in this directory during authoring and commit composer.lock. The installer only runs locked installs.\n\nRun php artisan module:prepare {$key} and module:pack {$key} from the host. Test the scoped runtime before publishing.\n";
+
         if ($backendOnly) {
             return $files;
         }
 
-        return [...$files,
-            'resources/js/pages.ts' => $this->stub('pages.ts', compact('key', 'name')),
-            'resources/js/pages/Index.tsx' => $this->stub('Index.tsx', compact('name')),
-            'resources/css/module.css' => $this->stub('module.css'),
-            'vite.config.ts' => $this->stub('vite.config.ts', compact('key')),
-            'tsconfig.json' => $this->stub('tsconfig.json'),
-            'package.json' => $this->package($key),
-        ];
+        if ($this->frontend === null) {
+            throw new InvalidModuleSourceException('Install frolaxhq/bedrock-frontend before generating a frontend module.');
+        }
+
+        return $this->frontend->extend($files, $key, $class, $name);
     }
 
     /** @param array<string, string> $replacements */
@@ -124,38 +133,5 @@ class ModuleScaffolder
         }
 
         return $contents;
-    }
-
-    protected function package(string $key): string
-    {
-        return json_encode([
-            'name' => '@modules/'.$key,
-            'private' => true,
-            'type' => 'module',
-            'packageManager' => 'pnpm@10.19.0',
-            'scripts' => [
-                'dev' => 'vite',
-                'build' => 'vite build && vite build --ssr resources/js/pages.ts && bedrock-artifact',
-                'types' => 'tsc --noEmit',
-            ],
-            'dependencies' => [
-                '@frolax/bedrock' => '^1.0.0',
-                '@inertiajs/react' => '^3.0.0',
-                '@tabler/icons-react' => '^3.48.0',
-                'react' => '^19.0.0',
-                'react-dom' => '^19.0.0',
-            ],
-            'devDependencies' => [
-                '@module-federation/vite' => '1.23.0',
-                '@tailwindcss/vite' => '^4.0.0',
-                '@types/node' => '^24.0.0',
-                '@types/react' => '^19.0.0',
-                '@types/react-dom' => '^19.0.0',
-                '@vitejs/plugin-react' => '^6.0.0',
-                'tailwindcss' => '^4.0.0',
-                'typescript' => '^5.9.0',
-                'vite' => '^8.0.0',
-            ],
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
     }
 }

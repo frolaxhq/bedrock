@@ -15,7 +15,12 @@ import {
     type NavigationRuntime,
 } from './navigation.js';
 
-export type { BedrockFrontendModule, BedrockSharedProps, PageResolver, ResolvedPage } from './types.js';
+export type {
+    BedrockFrontendModule,
+    BedrockSharedProps,
+    PageResolver,
+    ResolvedPage,
+} from './types.js';
 export {
     NavigationProvider,
     registerHostNavigation,
@@ -73,7 +78,8 @@ export class BedrockModuleErrorBoundary extends Component<ErrorBoundaryProps, Er
 
 export function createBedrockResolver(options: ResolverOptions): PageResolver {
     let currentPage: BedrockPage | undefined;
-    const loadNavigationRuntime = async (key: string) => loadRuntime(descriptorFor(key, currentPage), options.versions);
+    const loadNavigationRuntime = async (key: string) =>
+        loadRuntime(descriptorFor(key, currentPage), options.versions);
 
     if (!isServer()) {
         registerNavigationRefresh(() => {
@@ -138,7 +144,10 @@ function ensureCompatible(descriptor: BedrockFrontendModule, versions: Record<st
     }
 }
 
-async function loadRuntime(descriptor: BedrockFrontendModule, versions?: Record<string, string>): Promise<RemoteModule> {
+async function loadRuntime(
+    descriptor: BedrockFrontendModule,
+    versions?: Record<string, string>,
+): Promise<RemoteModule> {
     ensureCompatible(descriptor, versions ?? hostVersions());
 
     if (isServer()) return loadServer(descriptor);
@@ -168,7 +177,9 @@ async function loadClient(descriptor: BedrockFrontendModule): Promise<RemoteModu
             const loaded = await loadRemote<RemoteModule>(`${descriptor.key}/module`);
 
             if (!validRemote(loaded)) {
-                throw new Error(`Frontend module [${descriptor.key}] does not expose the ./module contract.`);
+                throw new Error(
+                    `Frontend module [${descriptor.key}] does not expose the ./module contract.`,
+                );
             }
 
             return loaded;
@@ -189,7 +200,9 @@ async function loadServer(descriptor: BedrockFrontendModule): Promise<RemoteModu
             const remote = loaded as RemoteModule;
 
             if (!validRemote(remote)) {
-                throw new Error(`SSR module [${descriptor.key}] does not export the module contract.`);
+                throw new Error(
+                    `SSR module [${descriptor.key}] does not export the module contract.`,
+                );
             }
 
             return remote;
@@ -210,10 +223,12 @@ function remember(id: string, pending: Promise<RemoteModule>): void {
 }
 
 function validRemote(remote: RemoteModule | undefined | null): remote is RemoteModule {
-    return Boolean(remote)
-        && typeof remote?.resolvePage === 'function'
-        && typeof remote.resolveNavigation === 'function'
-        && typeof remote.runNavigationAction === 'function';
+    return (
+        Boolean(remote) &&
+        typeof remote?.resolvePage === 'function' &&
+        typeof remote.resolveNavigation === 'function' &&
+        typeof remote.runNavigationAction === 'function'
+    );
 }
 
 function fileSpecifier(path: string): string {
@@ -240,8 +255,10 @@ function loadStyles(urls: string[]) {
 }
 
 function hostVersions(): Record<string, string> {
-    return (globalThis as typeof globalThis & { __BEDROCK_SHARED_VERSIONS__?: Record<string, string> })
-        .__BEDROCK_SHARED_VERSIONS__ ?? {};
+    return (
+        (globalThis as typeof globalThis & { __BEDROCK_SHARED_VERSIONS__?: Record<string, string> })
+            .__BEDROCK_SHARED_VERSIONS__ ?? {}
+    );
 }
 
 function isServer() {

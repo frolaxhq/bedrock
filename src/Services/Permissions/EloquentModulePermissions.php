@@ -7,12 +7,13 @@ namespace Frolax\Bedrock\Services\Permissions;
 use Frolax\Bedrock\Contracts\Module\ModuleRegistry;
 use Frolax\Bedrock\Contracts\Permissions\ModulePermissions;
 use Frolax\Bedrock\DataObjects\Permissions\PermissionDefinition;
+use Frolax\Bedrock\Events\Permissions\PermissionCatalogSynced;
 use Frolax\Bedrock\Models\ModulePermission;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
-use Spatie\Permission\Models\Permission;
 use Throwable;
 
 class EloquentModulePermissions implements ModulePermissions
@@ -44,7 +45,7 @@ class EloquentModulePermissions implements ModulePermissions
 
     public function sync(?string $module = null): void
     {
-        if (! $this->catalogAvailable() || ! $this->spatieAvailable()) {
+        if (! $this->catalogAvailable()) {
             return;
         }
 
@@ -53,6 +54,7 @@ class EloquentModulePermissions implements ModulePermissions
         foreach ($modules->filter() as $registered) {
             $this->syncModule((string) $registered->key, (array) $registered->toManifest()->permissions);
         }
+        event(new PermissionCatalogSynced($module));
     }
 
     public function deactivate(string $module): void
@@ -73,7 +75,7 @@ class EloquentModulePermissions implements ModulePermissions
 
     public function can(Authenticatable $user, string $module, string $key): bool
     {
-        return $user->can($this->name($module, $key));
+        return Gate::forUser($user)->allows($this->name($module, $key));
     }
 
     public function isManaged(string $ability): bool
@@ -110,7 +112,6 @@ class EloquentModulePermissions implements ModulePermissions
         $inactive->update(['active' => false]);
 
         foreach ($definitions as $definition) {
-            Permission::findOrCreate($definition['name'], $this->guard());
             $key = $definition['key'];
             unset($definition['key']);
             ModulePermission::query()->updateOrCreate(
@@ -172,19 +173,5 @@ class EloquentModulePermissions implements ModulePermissions
         } catch (Throwable) {
             return false;
         }
-    }
-
-    protected function spatieAvailable(): bool
-    {
-        try {
-            return Schema::hasTable(config('permission.table_names.permissions', 'permissions'));
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
-    protected function guard(): string
-    {
-        return (string) ($this->config['guard'] ?? 'web');
     }
 }

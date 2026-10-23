@@ -13,7 +13,8 @@ class ModulePackCommand extends ModuleCommand
     protected $signature = 'module:pack
         {module : A module key or source directory}
         {--output=dist/modules : The archive output directory}
-        {--force : Replace an existing archive}';
+        {--force : Replace an existing archive}
+        {--without-php-runtime : Package locked PHP sources without a prepared runtime}';
 
     protected $description = 'Build, validate, and package a module as a deterministic ZIP archive';
 
@@ -25,7 +26,7 @@ class ModulePackCommand extends ModuleCommand
         $output = ModulePath::absolute($this->laravel, (string) $this->option('output'));
 
         try {
-            $archive = $packager->pack($source, $output, (bool) $this->option('force'));
+            $archive = $packager->pack($source, $output, (bool) $this->option('force'), (bool) $this->option('without-php-runtime'));
         } catch (Throwable $exception) {
             return $this->failure($exception->getMessage());
         }

@@ -53,23 +53,38 @@ export function PanelUserMenu({
                             type="button"
                             variant="ghost"
                             aria-label={`Account menu for ${viewer.name}`}
-                            className={cn('h-auto w-full justify-start gap-3 rounded-lg p-2 font-normal text-sidebar-foreground', className)}
+                            className={cn(
+                                'h-auto w-full justify-start gap-3 rounded-lg p-2 font-normal text-sidebar-foreground',
+                                className,
+                            )}
                             {...props}
                         >
                             <Avatar size="sm">
                                 {viewer.avatar && <AvatarImage src={viewer.avatar} alt="" />}
-                                <AvatarFallback>{initials || <IconUser aria-hidden="true" />}</AvatarFallback>
+                                <AvatarFallback>
+                                    {initials || <IconUser aria-hidden="true" />}
+                                </AvatarFallback>
                             </Avatar>
                             <span className="min-w-0 flex-1 text-start">
-                                <span className="block truncate text-sm font-medium">{viewer.name}</span>
-                                {viewer.email && <span className="block truncate text-xs text-muted-foreground">{viewer.email}</span>}
+                                <span className="block truncate text-sm font-medium">
+                                    {viewer.name}
+                                </span>
+                                {viewer.email && (
+                                    <span className="block truncate text-xs text-muted-foreground">
+                                        {viewer.email}
+                                    </span>
+                                )}
                             </span>
                         </Button>
                     }
                 />
                 <DropdownMenuContent align="start" side="top">
                     <DropdownMenuLabel>{viewer.name}</DropdownMenuLabel>
-                    {viewer.email && <DropdownMenuLabel className="font-normal text-muted-foreground">{viewer.email}</DropdownMenuLabel>}
+                    {viewer.email && (
+                        <DropdownMenuLabel className="font-normal text-muted-foreground">
+                            {viewer.email}
+                        </DropdownMenuLabel>
+                    )}
                     <DropdownMenuSeparator />
                     {viewer.actions.profile && (
                         <DropdownMenuItem render={<Link href={viewer.actions.profile} />}>
@@ -86,7 +101,8 @@ export function PanelUserMenu({
                             <IconLogout aria-hidden="true" />
                             {logoutLabel}
                         </DropdownMenuItem>
-                    )}                </DropdownMenuContent>
+                    )}{' '}
+                </DropdownMenuContent>
             </DropdownMenu>
         </div>
     );

@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import ts from 'typescript';
@@ -15,10 +15,19 @@ const entries = files.map((file) => ({ id: conventionId(file), source: relative(
 validateEntries(entries);
 
 const catalog = `${JSON.stringify({ entries }, null, 4)}\n`;
-const ui = generateUi(files.filter((file) => /\/defaults\/(components|layouts)\//.test(posix(file))));
+const ui = generateUi(
+    files.filter((file) => /\/defaults\/(components|layouts)\//.test(posix(file))),
+);
 
 await synchronize(catalogFile, catalog);
 await synchronize(generatedUi, ui);
+
+// The optional PHP package ships these sources for ui:override without Node at runtime.
+const phpAssets = path.resolve(packageRoot, '../php/frontend/resources/frontend');
+await synchronize(path.join(phpAssets, 'catalog.json'), catalog);
+for (const file of files) {
+    await synchronize(path.join(phpAssets, relative(file)), await readFile(file, 'utf8'));
+}
 
 async function sourceFiles(directory) {
     const children = await readdir(directory, { recursive: true, withFileTypes: true });
@@ -45,9 +54,15 @@ function validateEntries(catalogEntries) {
     const ids = new Set();
 
     for (const entry of catalogEntries) {
-        if (!/^components\/(?:ui\/[a-z0-9]+(?:-[a-z0-9]+)*|panel-[a-z0-9]+(?:-[a-z0-9]+)*)$/.test(entry.id)
-            && !/^(hooks|layouts)\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.id)) {
-            throw new Error(`Frontend default [${entry.source}] does not follow the lowercase kebab-case convention.`);
+        if (
+            !/^components\/(?:ui\/[a-z0-9]+(?:-[a-z0-9]+)*|panel-[a-z0-9]+(?:-[a-z0-9]+)*)$/.test(
+                entry.id,
+            ) &&
+            !/^(hooks|layouts)\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.id)
+        ) {
+            throw new Error(
+                `Frontend default [${entry.source}] does not follow the lowercase kebab-case convention.`,
+            );
         }
 
         if (ids.has(entry.id)) {
@@ -85,19 +100,23 @@ function generateUi(uiFiles) {
         const types = [];
 
         for (const exported of checker.getExportsOfModule(moduleSymbol)) {
-            const symbol = exported.flags & ts.SymbolFlags.Alias
-                ? checker.getAliasedSymbol(exported)
-                : exported;
+            const symbol =
+                exported.flags & ts.SymbolFlags.Alias
+                    ? checker.getAliasedSymbol(exported)
+                    : exported;
             const name = exported.getName();
 
             if (symbol.flags & ts.SymbolFlags.Value) {
                 const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
                 const callable = declaration
-                    ? checker.getTypeOfSymbolAtLocation(symbol, declaration).getCallSignatures().length > 0
+                    ? checker.getTypeOfSymbolAtLocation(symbol, declaration).getCallSignatures()
+                          .length > 0
                     : false;
 
                 if (!callable) {
-                    throw new Error(`Runtime export [${name}] from [${relative(file)}] must be callable.`);
+                    throw new Error(
+                        `Runtime export [${name}] from [${relative(file)}] must be callable.`,
+                    );
                 }
 
                 claim(runtimeNames, name, file, 'runtime');
@@ -109,7 +128,9 @@ function generateUi(uiFiles) {
         }
 
         if (values.length === 0) {
-            throw new Error(`Frontend UI default [${relative(file)}] does not export a runtime value.`);
+            throw new Error(
+                `Frontend UI default [${relative(file)}] does not export a runtime value.`,
+            );
         }
 
         modules.push({
@@ -136,9 +157,13 @@ function generateUi(uiFiles) {
     for (const module of modules) {
         for (const value of module.values) {
             if (value.component) {
-                lines.push(`export const ${value.name} = component('${module.id}', '${value.name}', ${module.variable}.${value.name});`);
+                lines.push(
+                    `export const ${value.name} = component('${module.id}', '${value.name}', ${module.variable}.${value.name});`,
+                );
             } else {
-                lines.push(`export const ${value.name}: typeof ${module.variable}.${value.name} = createOverridableFunction('${module.id}', '${value.name}', ${module.variable}.${value.name});`);
+                lines.push(
+                    `export const ${value.name}: typeof ${module.variable}.${value.name} = createOverridableFunction('${module.id}', '${value.name}', ${module.variable}.${value.name});`,
+                );
             }
         }
 
@@ -151,7 +176,9 @@ function generateUi(uiFiles) {
 
             if (!typeNames.has(props)) {
                 claim(typeNames, props, module.file, 'generated type');
-                lines.push(`export type ${props} = ComponentProps<typeof ${module.variable}.${value.name}>;`);
+                lines.push(
+                    `export type ${props} = ComponentProps<typeof ${module.variable}.${value.name}>;`,
+                );
             }
         }
 
@@ -165,7 +192,9 @@ function claim(names, name, file, kind) {
     const existing = names.get(name);
 
     if (existing) {
-        throw new Error(`Duplicate ${kind} export [${name}] in [${relative(existing)}] and [${relative(file)}].`);
+        throw new Error(
+            `Duplicate ${kind} export [${name}] in [${relative(existing)}] and [${relative(file)}].`,
+        );
     }
 
     names.set(name, file);
@@ -177,8 +206,11 @@ async function synchronize(file, contents) {
     if (current === contents) return;
 
     if (checkOnly) {
-        throw new Error(`Generated frontend file [${relative(file)}] is out of date. Run [pnpm frontend:generate].`);
+        throw new Error(
+            `Generated frontend file [${relative(file)}] is out of date. Run [pnpm frontend:generate].`,
+        );
     }
 
+    await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, contents);
 }

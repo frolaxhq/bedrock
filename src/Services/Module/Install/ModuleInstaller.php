@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Services\Module\Install;
 
+use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\DisposableModuleSource;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\Contracts\Module\ModuleSource;
 use Frolax\Bedrock\DataObjects\Module\DiscoveredModule;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
 use Frolax\Bedrock\Exceptions\Module\ModuleAlreadyInstalledException;
+use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
 use Frolax\Bedrock\Support\Module\ModuleManifest;
 use Illuminate\Filesystem\Filesystem;
 
@@ -87,10 +89,20 @@ class ModuleInstaller
             throw InvalidModuleSourceException::notCopied($staged, $target);
         }
 
-        if (! @rename($temporary, $target)) {
-            $this->files->deleteDirectory($temporary);
+        try {
+            if (is_file($temporary.'/composer.json')) {
+                app(ComposerRequirementChecker::class)->ensureSatisfied($manifest);
+            }
+            app(PhpRuntime::class)->prepare($manifest, $temporary, (bool) config('bedrock.modules.php.offline', false));
+            $this->validator->validate($temporary);
 
-            throw InvalidModuleSourceException::notCopied($staged, $target);
+            if (! @rename($temporary, $target)) {
+                throw InvalidModuleSourceException::notCopied($staged, $target);
+            }
+        } finally {
+            if (is_dir($temporary)) {
+                $this->files->deleteDirectory($temporary);
+            }
         }
 
         return new DiscoveredModule($key, $target, $manifest);

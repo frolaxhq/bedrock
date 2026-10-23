@@ -1,5 +1,9 @@
 import type { ResolvedComponent } from '@inertiajs/react';
-import type { NavigationDescriptor, NavigationResolution, NavigationViewer } from '../module/index.js';
+import type {
+    NavigationDescriptor,
+    NavigationResolution,
+    NavigationViewer,
+} from '../module/index.js';
 
 export interface BedrockFrontendModule {
     key: string;
@@ -49,9 +53,7 @@ export interface BedrockPage {
     props: BedrockSharedProps;
 }
 
-export type ResolvedPage =
-    | ResolvedComponent
-    | { default: ResolvedComponent };
+export type ResolvedPage = ResolvedComponent | { default: ResolvedComponent };
 
 export type PageResolver = (
     name: string,

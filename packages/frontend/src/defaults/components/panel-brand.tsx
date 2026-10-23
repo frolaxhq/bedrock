@@ -16,10 +16,15 @@ export function PanelBrand({ className, name, ...props }: PanelBrandProps) {
     return (
         <div
             data-slot="panel-brand"
-            className={cn('flex min-h-14 items-center gap-2 px-3 text-sm font-semibold tracking-tight', className)}
+            className={cn(
+                'flex min-h-14 items-center gap-2 px-3 text-sm font-semibold tracking-tight',
+                className,
+            )}
             {...props}
         >
-            <span className="truncate" title={label}>{label}</span>
+            <span className="truncate" title={label}>
+                {label}
+            </span>
         </div>
     );
 }

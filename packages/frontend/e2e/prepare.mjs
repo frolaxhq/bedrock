@@ -10,11 +10,11 @@ const hostOutput = resolve(artifactRoot, 'host');
 const moduleOutput = resolve(repositoryRoot, 'workbench/modules/example/dist');
 
 rmSync(hostOutput, { recursive: true, force: true });
-run('pnpm', ['exec', 'vite', 'build', '--config', 'e2e/host/vite.config.ts'], packageRoot);
+run('pnpm', ['exec', 'vp', 'build', '--config', 'e2e/host/vite.config.ts'], packageRoot);
 const before = sha256(resolve(hostOutput, 'app.js'));
 
 rmSync(moduleOutput, { recursive: true, force: true });
-run('pnpm', ['--filter', '@modules/example', 'build'], repositoryRoot);
+run('pnpm', ['exec', 'vp', 'run', '@modules/example#build'], repositoryRoot);
 const after = sha256(resolve(hostOutput, 'app.js'));
 
 writeFileSync(

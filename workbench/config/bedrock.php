@@ -13,6 +13,9 @@ declare(strict_types=1);
 */
 
 return [
+    'administration' => [
+        'enabled' => true,
+    ],
     'modules' => [
         'path' => dirname(__DIR__).'/modules',
     ],

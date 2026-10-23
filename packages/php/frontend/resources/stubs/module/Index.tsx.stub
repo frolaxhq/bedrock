@@ -1,0 +1,16 @@
+import { Head } from '@inertiajs/react';
+import '../../css/module.css';
+
+export default function Index() {
+    return (
+        <main data-bedrock-module className="mx-auto max-w-5xl p-6">
+            <Head title="{{ name }}" />
+            <section className="rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm">
+                <h1 className="text-2xl font-semibold">{{ name }}</h1>
+                <p className="mt-2 text-muted-foreground">
+                    This page is loaded from an independent Bedrock module.
+                </p>
+            </section>
+        </main>
+    );
+}

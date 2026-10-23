@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Providers\Module;
 
+use Frolax\Bedrock\Http\Middleware\RequireModuleEnabled;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -102,13 +104,17 @@ abstract class ModuleServiceProvider extends ServiceProvider
         $web = $this->modulePath.'/routes/web.php';
 
         if ($this->modulePath !== '' && $this->files()->isFile($web)) {
-            $this->loadRoutesFrom($web);
+            Route::middleware(RequireModuleEnabled::class.':'.$this->moduleKey)->group(function () use ($web): void {
+                $this->loadRoutesFrom($web);
+            });
         }
 
         $api = $this->modulePath.'/routes/api.php';
 
         if ($this->modulePath !== '' && $this->files()->isFile($api)) {
-            $this->loadRoutesFrom($api);
+            Route::middleware(RequireModuleEnabled::class.':'.$this->moduleKey)->group(function () use ($api): void {
+                $this->loadRoutesFrom($api);
+            });
         }
     }
 

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from 'vite-plus/test';
 
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
     Object.defineProperty(window, 'matchMedia', {

@@ -1,12 +1,3 @@
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import { bedrockModule } from '@frolax/bedrock/vite';
-import { defineConfig } from 'vite';
+import { defineModuleConfig } from '@frolax/bedrock/vite';
 
-export default defineConfig(({ isSsrBuild }) => bedrockModule({
-    key: 'example',
-    entry: 'resources/js/pages.ts',
-    css: 'resources/css/module.css',
-    ssr: Boolean(isSsrBuild),
-    plugins: [react(), tailwindcss()],
-}));
+export default defineModuleConfig({ key: 'example' });

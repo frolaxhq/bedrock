@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react';
 import { expect, test } from '@playwright/test';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { createServer, type ViteDevServer } from 'vite';
+import { createServer, type ViteDevServer } from 'vite-plus';
 import { bedrockHost } from '../src/vite/index.js';
 
 const packageRoot = path.resolve(import.meta.dirname, '..');
@@ -39,7 +39,10 @@ test.beforeAll(async () => {
         }),
     );
     await writeFile(panelSlot, panelSource('First panel version'));
-    await writeFile(panelHeader, 'export default function Header() { return <header>Header</header>; }\n');
+    await writeFile(
+        panelHeader,
+        'export default function Header() { return <header>Header</header>; }\n',
+    );
     await writeFile(navigation, navigationSource('First navigation version'));
     await writeFile(
         path.join(fixtureRoot, 'src/main.tsx'),

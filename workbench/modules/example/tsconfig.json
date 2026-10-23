@@ -7,7 +7,7 @@
         "strict": true,
         "skipLibCheck": true,
         "noEmit": true,
-        "types": ["node", "vite/client"]
+        "types": ["node", "vite-plus/client"]
     },
     "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx", "vite.config.ts"]
 }

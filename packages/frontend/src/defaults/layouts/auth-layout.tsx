@@ -7,9 +7,22 @@ export interface AuthLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
     footer?: React.ReactNode;
 }
 
-export function AuthLayout({ header, aside, footer, children, className, ...props }: AuthLayoutProps) {
+export function AuthLayout({
+    header,
+    aside,
+    footer,
+    children,
+    className,
+    ...props
+}: AuthLayoutProps) {
     return (
-        <div className={cn('grid min-h-screen bg-background text-foreground lg:grid-cols-2', className)} {...props}>
+        <div
+            className={cn(
+                'grid min-h-screen bg-background text-foreground lg:grid-cols-2',
+                className,
+            )}
+            {...props}
+        >
             {aside && (
                 <aside className="hidden min-h-screen border-e border-border bg-muted/30 lg:block">
                     {aside}

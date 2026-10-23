@@ -1,0 +1,152 @@
+{
+    "entries": [
+        {
+            "id": "components/panel-brand",
+            "source": "src/defaults/components/panel-brand.tsx"
+        },
+        {
+            "id": "components/panel-breadcrumbs",
+            "source": "src/defaults/components/panel-breadcrumbs.tsx"
+        },
+        {
+            "id": "components/panel-header",
+            "source": "src/defaults/components/panel-header.tsx"
+        },
+        {
+            "id": "components/panel-navigation",
+            "source": "src/defaults/components/panel-navigation.tsx"
+        },
+        {
+            "id": "components/panel-user-menu",
+            "source": "src/defaults/components/panel-user-menu.tsx"
+        },
+        {
+            "id": "components/ui/alert",
+            "source": "src/defaults/components/ui/alert.tsx"
+        },
+        {
+            "id": "components/ui/avatar",
+            "source": "src/defaults/components/ui/avatar.tsx"
+        },
+        {
+            "id": "components/ui/badge",
+            "source": "src/defaults/components/ui/badge.tsx"
+        },
+        {
+            "id": "components/ui/breadcrumb",
+            "source": "src/defaults/components/ui/breadcrumb.tsx"
+        },
+        {
+            "id": "components/ui/button",
+            "source": "src/defaults/components/ui/button.tsx"
+        },
+        {
+            "id": "components/ui/card",
+            "source": "src/defaults/components/ui/card.tsx"
+        },
+        {
+            "id": "components/ui/checkbox",
+            "source": "src/defaults/components/ui/checkbox.tsx"
+        },
+        {
+            "id": "components/ui/collapsible",
+            "source": "src/defaults/components/ui/collapsible.tsx"
+        },
+        {
+            "id": "components/ui/dialog",
+            "source": "src/defaults/components/ui/dialog.tsx"
+        },
+        {
+            "id": "components/ui/dropdown-menu",
+            "source": "src/defaults/components/ui/dropdown-menu.tsx"
+        },
+        {
+            "id": "components/ui/empty-state",
+            "source": "src/defaults/components/ui/empty-state.tsx"
+        },
+        {
+            "id": "components/ui/empty",
+            "source": "src/defaults/components/ui/empty.tsx"
+        },
+        {
+            "id": "components/ui/error-state",
+            "source": "src/defaults/components/ui/error-state.tsx"
+        },
+        {
+            "id": "components/ui/input",
+            "source": "src/defaults/components/ui/input.tsx"
+        },
+        {
+            "id": "components/ui/label",
+            "source": "src/defaults/components/ui/label.tsx"
+        },
+        {
+            "id": "components/ui/loading-state",
+            "source": "src/defaults/components/ui/loading-state.tsx"
+        },
+        {
+            "id": "components/ui/page-content",
+            "source": "src/defaults/components/ui/page-content.tsx"
+        },
+        {
+            "id": "components/ui/page-header",
+            "source": "src/defaults/components/ui/page-header.tsx"
+        },
+        {
+            "id": "components/ui/select",
+            "source": "src/defaults/components/ui/select.tsx"
+        },
+        {
+            "id": "components/ui/separator",
+            "source": "src/defaults/components/ui/separator.tsx"
+        },
+        {
+            "id": "components/ui/sheet",
+            "source": "src/defaults/components/ui/sheet.tsx"
+        },
+        {
+            "id": "components/ui/skeleton",
+            "source": "src/defaults/components/ui/skeleton.tsx"
+        },
+        {
+            "id": "components/ui/sonner",
+            "source": "src/defaults/components/ui/sonner.tsx"
+        },
+        {
+            "id": "components/ui/spinner",
+            "source": "src/defaults/components/ui/spinner.tsx"
+        },
+        {
+            "id": "components/ui/switch",
+            "source": "src/defaults/components/ui/switch.tsx"
+        },
+        {
+            "id": "components/ui/tabs",
+            "source": "src/defaults/components/ui/tabs.tsx"
+        },
+        {
+            "id": "components/ui/textarea",
+            "source": "src/defaults/components/ui/textarea.tsx"
+        },
+        {
+            "id": "components/ui/theme-toggle",
+            "source": "src/defaults/components/ui/theme-toggle.tsx"
+        },
+        {
+            "id": "components/ui/tooltip",
+            "source": "src/defaults/components/ui/tooltip.tsx"
+        },
+        {
+            "id": "hooks/use-theme",
+            "source": "src/defaults/hooks/use-theme.ts"
+        },
+        {
+            "id": "layouts/app-layout",
+            "source": "src/defaults/layouts/app-layout.tsx"
+        },
+        {
+            "id": "layouts/auth-layout",
+            "source": "src/defaults/layouts/auth-layout.tsx"
+        }
+    ]
+}

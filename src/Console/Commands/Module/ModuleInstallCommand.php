@@ -8,6 +8,7 @@ use Frolax\Bedrock\Contracts\Module\ModuleSource;
 use Frolax\Bedrock\Exceptions\BedrockException;
 use Frolax\Bedrock\Services\Module\Install\LocalDirectorySource;
 use Frolax\Bedrock\Services\Module\Install\ZipSource;
+use Frolax\Bedrock\Services\Module\Operations\InstallationOperations;
 use Frolax\Bedrock\Support\Module\ModulePath;
 use Illuminate\Filesystem\Filesystem;
 
@@ -16,7 +17,10 @@ class ModuleInstallCommand extends ModuleCommand
     protected $signature = 'module:install
         {key : The module key}
         {--from= : A directory to install the module from}
-        {--zip= : A ZIP archive to install the module from}';
+        {--zip= : A ZIP archive to install the module from}
+        {--offline : Never download dependencies or tooling}
+        {--queue : Schedule installation on the background installation queue}
+        {--operation= : Internal installation operation identifier}';
 
     protected $description = 'Install a module from a directory, a ZIP archive, or an existing module directory';
 
@@ -44,6 +48,20 @@ class ModuleInstallCommand extends ModuleCommand
         }
 
         try {
+            if ($this->option('queue')) {
+                $operation = app(InstallationOperations::class)->schedule($key, $from, $zip, (bool) $this->option('offline'));
+                $this->components->info(sprintf('Queued installation [%s].', $operation->getKey()));
+
+                return self::SUCCESS;
+            }
+
+            $previousOffline = config('bedrock.modules.php.offline');
+            config()->set('bedrock.modules.php.offline', (bool) $this->option('offline') || (bool) $previousOffline);
+            config()->set('bedrock.modules.php.operation', $this->option('operation'));
+
+            if (is_string($this->option('operation')) && $this->option('operation') !== '') {
+                app(InstallationOperations::class)->start($this->option('operation'), $key);
+            }
             $source = $this->source($files, $from, $zip);
 
             if ($source === null) {
@@ -51,8 +69,16 @@ class ModuleInstallCommand extends ModuleCommand
             } else {
                 $this->manager()->installFrom($source, $key);
             }
+            // An already-installed module is a successful, idempotent operation too.
+            app(InstallationOperations::class)->stage('installing');
         } catch (BedrockException $exception) {
             return $this->failure($exception->getMessage());
+        } finally {
+            if (isset($previousOffline)) {
+                config()->set('bedrock.modules.php.offline', $previousOffline);
+            }
+            config()->set('bedrock.modules.php.operation', null);
+            app(InstallationOperations::class)->reset();
         }
 
         $this->components->info($source === null
