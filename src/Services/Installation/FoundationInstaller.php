@@ -65,6 +65,7 @@ class FoundationInstaller
             'resources/js/bedrock.tsx' => $this->files->get($root.'/resources/stubs/foundation/bedrock.tsx'),
             'resources/css/bedrock.css' => $this->files->get($root.'/resources/stubs/foundation/bedrock.css'),
             'vite.bedrock.config.ts' => $this->files->get($root.'/resources/stubs/foundation/vite.bedrock.config.ts'),
+            'tsconfig.json' => $this->files->get($root.'/resources/stubs/foundation/tsconfig.json'),
         ];
         $userPath = $this->basePath.'/app/Models/User.php';
 
