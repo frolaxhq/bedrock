@@ -90,6 +90,8 @@ class CachedModuleRegistry implements ModuleRegistry
 
     public function refresh(): void
     {
+        app(CompiledModuleBoot::class)->invalidate();
+
         try {
             $this->store()->forget($this->cacheKey());
         } catch (Throwable) {

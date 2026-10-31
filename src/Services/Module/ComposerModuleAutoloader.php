@@ -9,11 +9,15 @@ use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
 use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
+use WeakMap;
 
 class ComposerModuleAutoloader implements ModuleAutoloader
 {
     /** @var array<string, true> */
     protected array $loadedFiles = [];
+
+    /** @var WeakMap<ClassLoader, ModuleClassMapLoader>|null */
+    protected static ?WeakMap $compiledLoaders = null;
 
     public function register(Manifest $manifest, string $path, bool $loadFiles = false): void
     {
@@ -34,7 +38,12 @@ class ComposerModuleAutoloader implements ModuleAutoloader
             foreach ($maps['psr4'] as $prefix => $paths) {
                 $loader->addPsr4($prefix, $paths);
             }
-            $loader->addClassMap($maps['classmap']);
+
+            if (self::$compiledLoaders !== null && isset(self::$compiledLoaders[$loader])) {
+                $this->registerClassMap($maps['classmap'], $loader);
+            } else {
+                $loader->addClassMap($maps['classmap']);
+            }
 
             if ($loadFiles) {
                 foreach ($maps['files'] as $file) {
@@ -71,6 +80,83 @@ class ComposerModuleAutoloader implements ModuleAutoloader
             require_once $absolute;
             $this->loadedFiles[$real] = true;
         }
+    }
+
+    /** @param array{root: string, maps: array{psr4: array<string, list<string>>, classmap: array<string, string>, files: list<string>, private_classmap?: array<string, string>, groups?: array<string, array<string, string>>}} $loading */
+    public function registerLoading(array $loading): void
+    {
+        $loader = $this->loader();
+        foreach ($loading['maps']['psr4'] as $prefix => $paths) {
+            $loader->addPsr4($prefix, $paths);
+        }
+
+        if (isset($loading['maps']['groups'])) {
+            $this->registerGroupedClassMap($loading['maps']['groups'], $loader);
+        } elseif (isset($loading['maps']['private_classmap'])) {
+            $this->registerCompiledClassMap($loading['maps']['private_classmap'], $loader);
+
+            if ($loading['maps']['classmap'] !== []) {
+                $this->registerCompiledClassMap($loading['maps']['classmap'], $loader);
+            }
+        } else {
+            $this->registerClassMap($loading['maps']['classmap'], $loader);
+        }
+        foreach ($loading['maps']['files'] as $file) {
+            if (! isset($this->loadedFiles[$file])) {
+                require_once $file;
+                $this->loadedFiles[$file] = true;
+            }
+        }
+    }
+
+    /** @param array<string, string> $classmap */
+    protected function registerClassMap(array $classmap, ClassLoader $loader): void
+    {
+        $public = [];
+        $private = [];
+        foreach ($classmap as $class => $file) {
+            if (str_starts_with($class, 'BedrockPrivate\\')) {
+                $private[$class] = $file;
+            } else {
+                $public[$class] = $file;
+            }
+        }
+
+        $this->registerCompiledClassMap($private, $loader);
+
+        if ($public !== []) {
+            $this->registerCompiledClassMap($public, $loader);
+        }
+    }
+
+    /** @param array<string, string> $private */
+    protected function registerCompiledClassMap(array $private, ClassLoader $loader): void
+    {
+        if ($private === []) {
+            return;
+        }
+        $this->compiledLoader($loader)->addClassMap($private);
+    }
+
+    /** @param array<string, array<string, string>> $groups */
+    protected function registerGroupedClassMap(array $groups, ClassLoader $loader): void
+    {
+        if ($groups !== []) {
+            $this->compiledLoader($loader)->addGroupedClassMap($groups);
+        }
+    }
+
+    protected function compiledLoader(ClassLoader $loader): ModuleClassMapLoader
+    {
+        self::$compiledLoaders ??= new WeakMap;
+
+        if (! isset(self::$compiledLoaders[$loader])) {
+            $moduleLoader = new ModuleClassMapLoader;
+            $moduleLoader->registerBefore($loader);
+            self::$compiledLoaders[$loader] = $moduleLoader;
+        }
+
+        return self::$compiledLoaders[$loader];
     }
 
     public function failures(Manifest $manifest, string $path): array
@@ -114,7 +200,7 @@ class ComposerModuleAutoloader implements ModuleAutoloader
     protected function loader(): ClassLoader
     {
         foreach (spl_autoload_functions() ?: [] as $autoload) {
-            if (is_array($autoload) && $autoload[0] instanceof ClassLoader) {
+            if (is_array($autoload) && $autoload[0] instanceof ClassLoader && ! $autoload[0] instanceof ModuleClassMapLoader) {
                 return $autoload[0];
             }
         }

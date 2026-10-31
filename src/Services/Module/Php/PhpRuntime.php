@@ -6,6 +6,8 @@ namespace Frolax\Bedrock\Services\Module\Php;
 
 use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
+use Frolax\Bedrock\Support\Module\ModulePath;
+use Illuminate\Support\Facades\Cache;
 use JsonException;
 use Throwable;
 
@@ -103,15 +105,92 @@ class PhpRuntime
     }
 
     /** @return array{root: string, maps: array{psr4: array<string, list<string>>, classmap: array<string, string>, files: list<string>}} */
-    public function loading(Manifest $manifest, string $path): array
+    public function loading(Manifest $manifest, string $path, bool $force = false): array
     {
-        $this->validate($manifest, $path, true);
+        $key = $this->loadingCacheKey($manifest, $path);
+        $store = null;
 
-        if (! is_file($path.'/composer.json')) {
-            return ['root' => $path, 'maps' => $this->builder->legacyMaps($manifest, $path)];
+        if ($key !== null) {
+            try {
+                $store = Cache::store(config('bedrock.modules.php.validation.store'));
+                $cached = $force ? null : $store->get($key);
+
+                if (is_array($cached) && ($cached['schema'] ?? null) === 1
+                    && is_string($cached['loading']['root'] ?? null)
+                    && is_array($cached['loading']['maps']['psr4'] ?? null)
+                    && is_array($cached['loading']['maps']['classmap'] ?? null)
+                    && is_array($cached['loading']['maps']['files'] ?? null)) {
+                    return $cached['loading'];
+                }
+            } catch (Throwable) {
+                $store = null;
+            }
         }
 
-        return ['root' => rtrim($path, '/\\').'/dist/php/module', 'maps' => $this->readMaps($path.'/dist/php')];
+        $this->validate($manifest, $path, true);
+        $loading = ! is_file($path.'/composer.json')
+            ? ['root' => $path, 'maps' => $this->builder->legacyMaps($manifest, $path)]
+            : ['root' => rtrim($path, '/\\').'/dist/php/module', 'maps' => $this->readMaps($path.'/dist/php')];
+
+        if ($store !== null) {
+            try {
+                $store->put($key, ['schema' => 1, 'loading' => $loading], max(1, (int) config('bedrock.modules.php.validation.ttl', 300)));
+            } catch (Throwable) {
+                // Loading remains valid when the optional cache cannot be written.
+            }
+        }
+
+        return $loading;
+    }
+
+    protected function loadingCacheKey(Manifest $manifest, string $path): ?string
+    {
+        if (config('bedrock.modules.boot.strict_fallback', false)) {
+            return null;
+        }
+
+        $release = config('bedrock.modules.php.validation.release');
+
+        if (! app()->isProduction() || ! config('bedrock.modules.php.validation.cache', false)
+            || ! is_string($release) || trim($release) === '' || ! is_file($path.'/composer.json')) {
+            return null;
+        }
+
+        $files = [ModulePath::manifest(app()), 'composer.json', 'composer.lock', 'dist/php/runtime.json', 'dist/php/autoload.json'];
+        $hashes = [];
+
+        foreach ($files as $file) {
+            $absolute = $path.'/'.$file;
+
+            if (! is_file($absolute) || is_link($absolute)) {
+                return null;
+            }
+
+            $hash = hash_file('sha256', $absolute);
+
+            if ($hash === false) {
+                return null;
+            }
+
+            $hashes[$file] = $hash;
+        }
+
+        if (is_link($path.'/dist') || is_link($path.'/dist/php') || is_link($path.'/vendor') || is_link($path.'/vendor/composer')) {
+            return null;
+        }
+
+        $extensions = [];
+
+        foreach (get_loaded_extensions() as $extension) {
+            $extensions[$extension] = phpversion($extension);
+        }
+
+        ksort($extensions);
+
+        return 'bedrock.php.loading.'.hash('sha256', json_encode([
+            1, base_path(), realpath($path), realpath($path.'/dist/php'), PHP_VERSION, $extensions,
+            $release, $manifest->toArray(), $hashes,
+        ], JSON_THROW_ON_ERROR));
     }
 
     public function root(Manifest $manifest, string $path): string
@@ -155,6 +234,14 @@ class PhpRuntime
             throw new InvalidModuleSourceException('The module PHP runtime fingerprint does not match its Composer source/lock.');
         }
 
+        $this->verifyInventory($path, $runtime, $metadata);
+
+        $this->readMaps($runtime);
+    }
+
+    /** @param array<string, mixed> $metadata */
+    protected function verifyInventory(string $path, string $runtime, array $metadata): void
+    {
         if (($metadata['source'] ?? null) !== $this->builder->inventory($path, true)) {
             throw new InvalidModuleSourceException('The module PHP runtime source fingerprint is stale. Prepare it again from clean source.');
         }
@@ -165,8 +252,6 @@ class PhpRuntime
         if (($metadata['files'] ?? null) !== $inventory) {
             throw new InvalidModuleSourceException('The module PHP runtime inventory failed SHA256 verification.');
         }
-
-        $this->readMaps($runtime);
     }
 
     /** @return array{psr4: array<string, list<string>>, classmap: array<string, string>, files: list<string>} */

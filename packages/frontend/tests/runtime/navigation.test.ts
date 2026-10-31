@@ -67,6 +67,19 @@ async function flush(): Promise<void> {
 }
 
 describe('prepareNavigation', () => {
+    it('renders server-authorized host links without loading a remote module', async () => {
+        resetNavigationStore();
+        const load = vi.fn();
+        const current = page({
+            navigation: [
+                envelope({ module: '@host', key: 'dashboard', label: 'Dashboard', href: '/admin' }),
+            ],
+        });
+        await prepareNavigation(current, load);
+        expect(load).not.toHaveBeenCalled();
+        expect(current.props.__bedrock?.resolvedNavigation?.items[0]?.label).toBe('Dashboard');
+    });
+
     beforeEach(() => {
         resetNavigationStore();
     });

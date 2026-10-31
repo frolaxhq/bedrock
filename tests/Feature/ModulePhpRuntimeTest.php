@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 use CollisionSdkFixture\Client;
 use Composer\Autoload\ClassLoader;
+use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
+use Frolax\Bedrock\Contracts\Module\ModuleRepository;
 use Frolax\Bedrock\DataObjects\Module\Manifest;
+use Frolax\Bedrock\Enums\Module\ModuleStatus;
 use Frolax\Bedrock\Exceptions\Module\InvalidModuleSourceException;
+use Frolax\Bedrock\Models\Module;
+use Frolax\Bedrock\Services\Module\CompiledModuleBoot;
+use Frolax\Bedrock\Services\Module\ModuleBootstrapper;
 use Frolax\Bedrock\Services\Module\Php\DependencyManifest;
 use Frolax\Bedrock\Services\Module\Php\PhpRuntime;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Psr\Container\ContainerInterface;
 
@@ -269,5 +277,251 @@ it('scopes two incompatible sdk versions alongside the host using the real isola
         $loader->unregister();
         File::deleteDirectory($one);
         File::deleteDirectory($two);
+    }
+});
+
+it('caches immutable production loading validation but keeps explicit checks strict', function (): void {
+    [$manifest, $path] = phpRuntimeSource('cached-loading');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'release-one', 'ttl' => 60]);
+
+    try {
+        $runtime = app(PhpRuntime::class);
+        $runtime->prepare($manifest, $path, true);
+        $runtime->loading($manifest, $path);
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+        $runtime->loading($manifest, $path);
+        expect(fn () => $runtime->validate($manifest, $path, true))->toThrow(InvalidModuleSourceException::class, 'source');
+        config()->set('bedrock.modules.php.validation.release', 'release-two');
+        expect(fn () => $runtime->loading($manifest, $path))->toThrow(InvalidModuleSourceException::class, 'source');
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('fully validates loading outside an opted-in immutable production release', function (string $environment, ?string $release, bool $enabled): void {
+    [$manifest, $path] = phpRuntimeSource('uncached-loading');
+    app()->detectEnvironment(fn (): string => $environment);
+    config()->set('bedrock.modules.php.validation', ['cache' => $enabled, 'release' => $release]);
+
+    try {
+        $runtime = app(PhpRuntime::class);
+        $runtime->prepare($manifest, $path, true);
+        $runtime->loading($manifest, $path);
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+        expect(fn () => $runtime->loading($manifest, $path))->toThrow(InvalidModuleSourceException::class, 'source');
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+})->with([['local', 'one', true], ['production', null, true], ['production', 'one', false]]);
+
+it('revalidates cached production inventories after expiry or metadata changes', function (bool $metadataChanged): void {
+    [$manifest, $path] = phpRuntimeSource('expired-loading');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'one', 'ttl' => 60]);
+
+    try {
+        $runtime = app(PhpRuntime::class);
+        $runtime->prepare($manifest, $path, true);
+        $runtime->loading($manifest, $path);
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+
+        if ($metadataChanged) {
+            $metadata = json_decode(File::get($path.'/dist/php/runtime.json'), true, flags: JSON_THROW_ON_ERROR);
+            $metadata['changed'] = true;
+            File::put($path.'/dist/php/runtime.json', json_encode($metadata, JSON_THROW_ON_ERROR));
+        } else {
+            $this->travel(61)->seconds();
+        }
+        expect(fn () => $runtime->loading($manifest, $path))->toThrow(InvalidModuleSourceException::class, 'source');
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        $this->travelBack();
+        File::deleteDirectory($path);
+    }
+})->with([false, true]);
+
+it('falls back to full inventory validation when the cache is unavailable', function (): void {
+    [$manifest, $path] = phpRuntimeSource('cache-unavailable');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'one']);
+
+    try {
+        $runtime = app(PhpRuntime::class);
+        $runtime->prepare($manifest, $path, true);
+        Cache::shouldReceive('store')->andThrow(new RuntimeException('offline'));
+        $runtime->loading($manifest, $path);
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+        expect(fn () => $runtime->loading($manifest, $path))->toThrow(InvalidModuleSourceException::class, 'source');
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('forces strict verification when warming an already cached descriptor', function (): void {
+    [$manifest, $path] = phpRuntimeSource('warm-loading');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'warm']);
+
+    try {
+        $runtime = app(PhpRuntime::class);
+        $runtime->prepare($manifest, $path, true);
+        $runtime->loading($manifest, $path);
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+        expect(fn () => $runtime->loading($manifest, $path, true))->toThrow(InvalidModuleSourceException::class, 'source');
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('invalidates loading descriptors when composer metadata changes', function (): void {
+    [$manifest, $path] = phpRuntimeSource('changed-composer');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'one']);
+
+    try {
+        $runtime = app(PhpRuntime::class);
+        $runtime->prepare($manifest, $path, true);
+        $runtime->loading($manifest, $path);
+        File::put($path.'/composer.lock', '{"packages":[]}');
+        expect(fn () => $runtime->loading($manifest, $path))->toThrow(InvalidModuleSourceException::class);
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('rejects warming without an immutable production deployment configuration', function (): void {
+    $this->artisan('module:cache', ['--warm' => true])->assertFailed();
+});
+
+it('warms enabled runtimes and reports corrupt sources on an explicit rewarm', function (): void {
+    [$manifest, $path] = phpRuntimeSource('command-warm');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'one']);
+
+    try {
+        app(PhpRuntime::class)->prepare($manifest, $path, true);
+        $this->seedModule($manifest->key, ['status' => ModuleStatus::Enabled, 'path' => $path, 'manifest' => $manifest->toArray()]);
+        $this->artisan('module:cache', ['--warm' => true])->expectsOutputToContain('Fully verified and warmed 1')->assertSuccessful();
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+        $this->artisan('module:cache', ['--warm' => true])->assertFailed();
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('compiles enabled isolated runtimes and refuses changed sources on rebuild', function (): void {
+    [$manifest, $path] = phpRuntimeSource('compiled-runtime');
+
+    try {
+        app(PhpRuntime::class)->prepare($manifest, $path, true);
+        $this->seedModule($manifest->key, ['status' => ModuleStatus::Enabled, 'path' => $path, 'manifest' => $manifest->toArray()]);
+        app()->detectEnvironment(fn (): string => 'production');
+        config(['bedrock.modules.boot.compiled' => true, 'bedrock.modules.php.validation.cache' => true, 'bedrock.modules.php.validation.release' => bin2hex(random_bytes(8))]);
+        $this->artisan('module:cache', ['--warm' => true])->assertSuccessful();
+        $boot = app(CompiledModuleBoot::class);
+        expect($boot->read()['modules'][0]['loading']['root'])->toBe($path.'/dist/php/module');
+        File::put($path.'/src/Provider.php', '<?php namespace RuntimeFixture; class Changed {}');
+        $this->artisan('module:cache', ['--warm' => true])->assertFailed();
+        expect($boot->read())->toBeNull();
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('executes custom provider hooks through compiled autoload maps', function (): void {
+    [$unused, $path] = phpRuntimeSource('compiled-hooks', false);
+    $manifest = new Manifest(key: 'compiled-hooks', name: 'Hooks', version: '1.0.0', provider: 'CompiledHooksFixture\\Provider', autoload: ['psr-4' => ['CompiledHooksFixture\\' => 'src/']]);
+
+    try {
+        File::put($path.'/module.json', json_encode($manifest->toArray(), JSON_THROW_ON_ERROR));
+        File::put($path.'/src/Provider.php', '<?php namespace CompiledHooksFixture; class Provider extends \\Illuminate\\Support\\ServiceProvider { public function register(): void { config(["compiled_hooks.register" => true]); } public function boot(): void { config(["compiled_hooks.boot" => true]); } }');
+        $this->seedModule($manifest->key, ['status' => ModuleStatus::Enabled, 'path' => $path, 'provider' => $manifest->provider, 'manifest' => $manifest->toArray()]);
+        app()->detectEnvironment(fn (): string => 'production');
+        config(['bedrock.modules.boot.compiled' => true, 'bedrock.modules.php.validation.cache' => true, 'bedrock.modules.php.validation.release' => bin2hex(random_bytes(8))]);
+        $this->artisan('module:cache', ['--warm' => true])->assertSuccessful();
+        $hydrations = 0;
+        Module::retrieved(function () use (&$hydrations): void {
+            $hydrations++;
+        });
+        app(ModuleBootstrapper::class)->bootstrap();
+        expect($hydrations)->toBe(0);
+        expect(config('compiled_hooks.register'))->toBeTrue()->and(config('compiled_hooks.boot'))->toBeTrue();
+        app(ModuleRepository::class)->upsert($manifest->key, ['status' => ModuleStatus::Disabled]);
+        expect(app(CompiledModuleBoot::class)->read())->toBeNull();
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
+    }
+});
+
+it('stops compiled dependents after a provider registration failure', function (): void {
+    [$unused, $first] = phpRuntimeSource('compiled-fails', false);
+    [$unused, $second] = phpRuntimeSource('compiled-dependent', false);
+    $manifests = [
+        [$first, new Manifest(key: 'compiled-fails', name: 'Fails', version: '1.0.0', provider: 'CompiledFailureFixture\\Provider', autoload: ['psr-4' => ['CompiledFailureFixture\\' => 'src/']])],
+        [$second, new Manifest(key: 'compiled-dependent', name: 'Dependent', version: '1.0.0', provider: 'CompiledDependentFixture\\Provider', requires: ['compiled-fails' => '^1.0'], autoload: ['psr-4' => ['CompiledDependentFixture\\' => 'src/']])],
+    ];
+
+    try {
+        File::put($first.'/src/Provider.php', '<?php namespace CompiledFailureFixture; class Provider extends \\Illuminate\\Support\\ServiceProvider { public function register(): void { throw new \\RuntimeException("provider failed"); } }');
+        File::put($second.'/src/Provider.php', '<?php namespace CompiledDependentFixture; class Provider extends \\Illuminate\\Support\\ServiceProvider { public function register(): void { config(["compiled_dependent_ran" => true]); } }');
+        foreach ($manifests as [$path, $manifest]) {
+            File::put($path.'/module.json', json_encode($manifest->toArray(), JSON_THROW_ON_ERROR));
+            $this->seedModule($manifest->key, ['status' => ModuleStatus::Enabled, 'path' => $path, 'provider' => $manifest->provider, 'manifest' => $manifest->toArray()]);
+        }
+        app()->detectEnvironment(fn (): string => 'production');
+        config(['bedrock.modules.boot.compiled' => true, 'bedrock.modules.php.validation.cache' => true, 'bedrock.modules.php.validation.release' => bin2hex(random_bytes(8))]);
+        $this->artisan('module:cache', ['--warm' => true])->assertSuccessful();
+        app(ModuleBootstrapper::class)->bootstrap();
+        expect(config('compiled_dependent_ran', false))->toBeFalse();
+        expect(app(ModuleRepository::class)->find('compiled-dependent')->hasFailed())->toBeTrue();
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($first);
+        File::deleteDirectory($second);
+    }
+});
+
+it('warms conventional provider resources while leaving unknown paths dynamic', function (): void {
+    [$unused, $path] = phpRuntimeSource('compiled-resources', false);
+    $manifest = new Manifest(key: 'compiled-resources', name: 'Resources', version: '1.0.0', provider: 'CompiledResourcesFixture\\Provider', autoload: ['psr-4' => ['CompiledResourcesFixture\\' => 'src/']]);
+
+    try {
+        File::put($path.'/module.json', json_encode($manifest->toArray(), JSON_THROW_ON_ERROR));
+        File::put($path.'/src/Provider.php', '<?php namespace CompiledResourcesFixture; class Provider extends \\Frolax\\Bedrock\\Providers\\Module\\ModuleServiceProvider { protected string $moduleKey = "compiled-resources"; protected string $modulePath = __DIR__."/.."; }');
+        File::ensureDirectoryExists($path.'/resources/views');
+        $this->seedModule($manifest->key, ['status' => ModuleStatus::Enabled, 'path' => $path, 'provider' => $manifest->provider, 'manifest' => $manifest->toArray()]);
+        app(ModuleAutoloader::class)->register($manifest, $path);
+        expect(class_exists($manifest->provider))->toBeTrue();
+        app()->detectEnvironment(fn (): string => 'production');
+        config(['bedrock.modules.boot.compiled' => true, 'bedrock.modules.php.validation.cache' => true, 'bedrock.modules.php.validation.release' => bin2hex(random_bytes(8))]);
+        $this->artisan('module:cache', ['--warm' => true])->assertSuccessful();
+        $boot = app(CompiledModuleBoot::class);
+        expect($boot->read())->not->toBeNull();
+        expect($boot->resourceExists($manifest->provider, $path.'/src/../resources/views'))->toBeTrue()
+            ->and($boot->resourceExists($manifest->provider, $path.'/src/../lang'))->toBeFalse()
+            ->and($boot->resourceExists($manifest->provider, $path.'/custom/views'))->toBeNull();
+        $files = Mockery::mock(Filesystem::class)->makePartial();
+        $files->shouldReceive('isDirectory')->andReturn(false)->byDefault();
+        $files->shouldReceive('isDirectory')->with($path.'/src/../resources/views')->once()->andReturn(false);
+        $files->shouldReceive('isDirectory')->with($path.'/src/../lang')->once()->andReturn(false);
+        app()->instance('files', $files);
+        app(ModuleBootstrapper::class)->bootstrap();
+        expect(app()->getProvider($manifest->provider))->not->toBeNull();
+        app()->instance('files', new Filesystem);
+        config(['bedrock.modules.php.validation.release' => 'different-release']);
+        expect($boot->read())->toBeNull()
+            ->and($boot->resourceExists($manifest->provider, $path.'/src/../resources/views'))->toBeNull();
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+        File::deleteDirectory($path);
     }
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Frolax\Bedrock\Providers\Module;
 
 use Frolax\Bedrock\Http\Middleware\RequireModuleEnabled;
+use Frolax\Bedrock\Services\Module\CompiledModuleBoot;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Route;
@@ -37,7 +38,10 @@ abstract class ModuleServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->registerModuleConfig();
-        $this->registerModuleMigrations();
+
+        if ($this->app->runningInConsole()) {
+            $this->registerModuleMigrations();
+        }
     }
 
     /**
@@ -73,6 +77,10 @@ abstract class ModuleServiceProvider extends ServiceProvider
      */
     protected function registerModuleConfig(): void
     {
+        if ($this->app->configurationIsCached()) {
+            return;
+        }
+
         $config = $this->moduleConfigPath();
 
         if ($this->moduleKey !== '' && $config !== null && $this->files()->isFile($config)) {
@@ -101,6 +109,10 @@ abstract class ModuleServiceProvider extends ServiceProvider
      */
     protected function bootModuleRoutes(): void
     {
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
         $web = $this->modulePath.'/routes/web.php';
 
         if ($this->modulePath !== '' && $this->files()->isFile($web)) {
@@ -127,7 +139,7 @@ abstract class ModuleServiceProvider extends ServiceProvider
     {
         $views = $this->modulePath.'/resources/views';
 
-        if ($this->moduleKey !== '' && $this->modulePath !== '' && $this->files()->isDirectory($views)) {
+        if ($this->moduleKey !== '' && $this->modulePath !== '' && $this->moduleDirectoryExists($views)) {
             $this->loadViewsFrom($views, $this->moduleKey);
         }
     }
@@ -141,9 +153,19 @@ abstract class ModuleServiceProvider extends ServiceProvider
     {
         $lang = $this->modulePath.'/lang';
 
-        if ($this->moduleKey !== '' && $this->modulePath !== '' && $this->files()->isDirectory($lang)) {
+        if ($this->moduleKey !== '' && $this->modulePath !== '' && $this->moduleDirectoryExists($lang)) {
             $this->loadTranslationsFrom($lang, $this->moduleKey);
         }
+    }
+
+    protected function moduleDirectoryExists(string $path): bool
+    {
+        $files = $this->files();
+        $cached = $files::class === Filesystem::class
+            ? $this->app->make(CompiledModuleBoot::class)->resourceExists(static::class, $path)
+            : null;
+
+        return $cached ?? $files->isDirectory($path);
     }
 
     /**

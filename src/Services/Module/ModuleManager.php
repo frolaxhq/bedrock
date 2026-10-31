@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Frolax\Bedrock\Services\Module;
 
 use Closure;
+use Composer\Semver\Comparator;
 use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
 use Frolax\Bedrock\Contracts\Module\ModuleDiscoverer;
@@ -28,6 +29,7 @@ use Frolax\Bedrock\Events\Module\ModuleEnabled;
 use Frolax\Bedrock\Events\Module\ModuleInstalled;
 use Frolax\Bedrock\Events\Module\ModuleRegistryChanged;
 use Frolax\Bedrock\Events\Module\ModuleUninstalled;
+use Frolax\Bedrock\Events\Module\ModuleUpgraded;
 use Frolax\Bedrock\Exceptions\Frontend\InvalidFrontendArtifactException;
 use Frolax\Bedrock\Exceptions\Module\CircularDependencyException;
 use Frolax\Bedrock\Exceptions\Module\InvalidLifecycleTransitionException;
@@ -36,6 +38,7 @@ use Frolax\Bedrock\Exceptions\Module\ModuleDatabaseException;
 use Frolax\Bedrock\Exceptions\Module\ModuleLockException;
 use Frolax\Bedrock\Exceptions\Module\ModuleNotFoundException;
 use Frolax\Bedrock\Models\Module;
+use Frolax\Bedrock\Models\ModuleInstallation;
 use Frolax\Bedrock\Services\Module\Install\DatabaseModuleRunner;
 use Frolax\Bedrock\Services\Module\Install\ModuleInstaller;
 use Frolax\Bedrock\Services\Module\Operations\InstallationOperations;
@@ -135,6 +138,102 @@ class ModuleManager implements ModuleManagerContract
 
             return true;
         }, $module->key);
+    }
+
+    public function upgrade(string $key): bool
+    {
+        $keys = array_values($this->repository->all()->pluck('key')->all());
+        $keys[] = $key;
+        $keys[] = '__sync';
+
+        return $this->withLocks($keys, function () use ($key): bool {
+            $registered = $this->repository->findOrFail($key);
+            $previousVersion = (string) $registered->version;
+
+            if (! in_array($registered->status, [ModuleStatus::Installed, ModuleStatus::Disabled], true)) {
+                throw new InvalidLifecycleTransitionException('Disable the module and its enabled dependents before upgrading; discovered modules must be installed first.');
+            }
+
+            if (ModuleInstallation::query()->where('active_key', $key)->exists()) {
+                throw new InvalidLifecycleTransitionException('An installation is queued or running for this module. Recover expired operations before upgrading.');
+            }
+
+            $path = $this->ownedPath($registered);
+            $discovery = $this->discoverer->discover();
+            $module = $discovery->find($key) ?? throw new InvalidModuleSourceException($discovery->failures[$key] ?? 'The deployed module manifest is missing.');
+
+            if ($module->path !== $path && realpath($module->path) !== $path) {
+                throw new InvalidModuleSourceException('The deployed module path does not match the registered module.');
+            }
+
+            if (! Comparator::greaterThan($module->manifest->version, (string) $registered->version)) {
+                throw new InvalidLifecycleTransitionException('An upgrade requires a version newer than the registered version.');
+            }
+
+            $this->installationOrder($discovery, $key);
+            $constraints = $this->app->make(VersionConstraint::class);
+
+            foreach ($this->repository->all() as $dependent) {
+                $constraint = $dependent->dependencies[$key] ?? null;
+
+                if ($constraint !== null && $dependent->status === ModuleStatus::Enabled) {
+                    throw new InvalidLifecycleTransitionException(sprintf('Disable dependent module [%s] before upgrading.', $dependent->key));
+                }
+
+                if (is_string($constraint) && ! $constraints->matches($module->manifest->version, $constraint)) {
+                    throw new InvalidLifecycleTransitionException(sprintf('Module [%s] requires [%s %s]; upgrade refused.', $dependent->key, $key, $constraint));
+                }
+            }
+
+            try {
+                $this->core->ensureSatisfied($module->manifest);
+                $this->composer->ensureSatisfied($module->manifest);
+
+                if ($this->guard->missing($module->manifest) !== [] || $this->guard->incompatible($module->manifest) !== []) {
+                    throw new InvalidModuleSourceException('Upgrade dependencies must already be installed at compatible versions.');
+                }
+
+                foreach ($module->manifest->requirements() as $dependency) {
+                    $required = $this->repository->findOrFail($dependency);
+
+                    if ($required->status === ModuleStatus::Discovered || $required->hasFailed()) {
+                        throw new InvalidModuleSourceException('Upgrade dependencies must already be installed and healthy.');
+                    }
+                }
+
+                $this->app->make(PhpRuntime::class)->prepare($module->manifest, $module->path, (bool) config('bedrock.modules.php.offline', false));
+                $this->autoloader->register($module->manifest, $module->path, true);
+
+                if (! class_exists($module->manifest->provider)) {
+                    throw new InvalidModuleSourceException('The upgrade module provider does not exist.');
+                }
+
+                $this->features->ensureValid($module->manifest, $module->path);
+                $this->features->publish($module->manifest, $module->path);
+                $this->database->run($module, false);
+                $updated = $this->repository->upsert($key, [
+                    'name' => $module->manifest->name,
+                    'version' => $module->manifest->version,
+                    'provider' => $module->manifest->provider,
+                    'path' => $module->path,
+                    'manifest' => $module->manifest->toArray(),
+                    'dependencies' => $module->manifest->requires,
+                ]);
+                $this->health->recover($updated);
+                $this->registry->refresh();
+                $this->permissions->sync($key);
+            } catch (Throwable $exception) {
+                $this->health->fail($registered, $exception instanceof ModuleDatabaseException ? ModuleFailureCode::DatabaseFailed : ModuleFailureCode::BootstrapFailed, $exception->getMessage(), $exception);
+                $this->registry->refresh();
+
+                throw $exception;
+            }
+
+            event(new ModuleRegistryChanged);
+            event(new ModuleUpgraded($key, $module->manifest, $previousVersion));
+
+            return true;
+        }, $key);
     }
 
     public function installFrom(ModuleSource $source, string $key): bool
@@ -398,7 +497,25 @@ class ModuleManager implements ModuleManagerContract
     protected function withLocks(array $keys, Closure $operation, ?string $failureKey = null): mixed
     {
         try {
-            return $this->locks->synchronized($keys, $operation);
+            $result = $this->locks->synchronized($keys, function () use ($operation): mixed {
+                app(CompiledModuleBoot::class)->invalidate();
+
+                return $operation();
+            });
+            $compiled = app(CompiledModuleBoot::class);
+
+            if ($compiled->enabled()) {
+                $this->registry->refresh();
+
+                try {
+                    $compiled->warm();
+                } catch (Throwable $exception) {
+                    // The mutation succeeded; an unavailable artifact uses strict boot.
+                    report($exception);
+                }
+            }
+
+            return $result;
         } catch (ModuleLockException $exception) {
             $module = $failureKey === null ? null : $this->repository->find($failureKey);
 

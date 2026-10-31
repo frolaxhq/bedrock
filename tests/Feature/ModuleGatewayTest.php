@@ -42,6 +42,7 @@ it('delegates lifecycle operations through the module gateway', function () {
     $manager = Mockery::mock(ModuleManager::class);
     $manager->shouldReceive('sync')->once()->andReturn($result);
     $manager->shouldReceive('install')->once()->with('alpha')->andReturnTrue();
+    $manager->shouldReceive('upgrade')->once()->with('alpha')->andReturnTrue();
     $manager->shouldReceive('installFrom')->once()->with($source, 'alpha')->andReturnTrue();
     $manager->shouldReceive('uninstall')->once()->with('alpha')->andReturnTrue();
     $manager->shouldReceive('enable')->once()->with('alpha')->andReturnTrue();
@@ -51,6 +52,7 @@ it('delegates lifecycle operations through the module gateway', function () {
 
     expect($gateway->sync())->toBe($result)
         ->and($gateway->install('alpha'))->toBeTrue()
+        ->and($gateway->upgrade('alpha'))->toBeTrue()
         ->and($gateway->installFrom($source, 'alpha'))->toBeTrue()
         ->and($gateway->uninstall('alpha'))->toBeTrue()
         ->and($gateway->enable('alpha'))->toBeTrue()

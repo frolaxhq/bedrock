@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static ModuleModel|null find(string $key)
  * @method static bool isEnabled(string $key)
  * @method static ModuleDiscoveryResult sync()
+ * @method static bool upgrade(string $key)
  * @method static bool install(string $key)
  * @method static bool installFrom(ModuleSource $source, string $key)
  * @method static bool uninstall(string $key)

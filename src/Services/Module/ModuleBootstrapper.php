@@ -37,6 +37,37 @@ class ModuleBootstrapper
      */
     public function bootstrap(): void
     {
+        $compiled = app(CompiledModuleBoot::class);
+        $snapshot = $compiled->read();
+
+        $autoloader = $this->autoloader;
+
+        if ($snapshot !== null && $autoloader instanceof ComposerModuleAutoloader) {
+            $failed = false;
+            foreach ($snapshot['modules'] as $entry) {
+                if ($failed) {
+                    $this->bootstrapModule((new Module)->newFromBuilder($entry['attributes']));
+
+                    continue;
+                }
+
+                try {
+                    $autoloader->registerLoading($entry['loading']);
+                    $this->app->register($entry['attributes']['provider']);
+                } catch (Throwable $exception) {
+                    $failed = true;
+                    config(['bedrock.modules.boot.strict_fallback' => true]);
+                    $module = (new Module)->newFromBuilder($entry['attributes']);
+                    $this->fail($module, ModuleFailureCode::BootstrapFailed, $exception->getMessage(), $exception, true);
+                }
+            }
+
+            return;
+        }
+
+        if ($compiled->enabled()) {
+            config(['bedrock.modules.boot.strict_fallback' => true]);
+        }
         $enabled = $this->registry->enabled()->keyBy('key');
 
         try {
@@ -74,11 +105,12 @@ class ModuleBootstrapper
         $provider = $module->provider;
 
         try {
-            $this->core->ensureSatisfied($module->toManifest());
-            $this->composer->ensureSatisfied($module->toManifest());
-            $this->features->ensureSupported($module->toManifest());
-            $this->autoloader->register($module->toManifest(), (string) $module->path, true);
-            $this->guard->ensureSatisfied($module->toManifest());
+            $manifest = $module->toManifest();
+            $this->core->ensureSatisfied($manifest);
+            $this->composer->ensureSatisfied($manifest);
+            $this->features->ensureSupported($manifest);
+            $this->autoloader->register($manifest, (string) $module->path, true);
+            $this->guard->ensureSatisfied($manifest);
         } catch (Throwable $exception) {
             $this->fail($module, ModuleFailureCode::BootstrapFailed, $exception->getMessage(), $exception);
 

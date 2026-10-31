@@ -84,7 +84,7 @@ class ModuleFeatureHandlers
 
         if ($handler === null) {
             throw InvalidFrontendArtifactException::for($manifest->key, sprintf(
-                'No handler is installed for frontend driver [%s]. Install frolaxhq/bedrock-frontend for inertia-react modules.',
+                'No handler is installed for frontend driver [%s]. Install frolaxhq/bedrock for inertia-react modules.',
                 is_string($driver) ? $driver : 'invalid',
             ));
         }

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       dry_run:
-        description: Validate and build only; do not tag, publish, or push split packages
+        description: Validate and build only; do not tag or publish packages
         required: true
         default: true
         type: boolean
@@ -114,18 +114,6 @@ jobs:
 
       - name: Build frontend package
         run: pnpm frontend:build
-
-      - name: Publish split Composer packages
-        env:
-          RELEASE_TOKEN: ${{ secrets.FROLAXHQ_RELEASE_TOKEN }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: |
-          test -n "$RELEASE_TOKEN"
-          for package in access-spatie admin frontend; do
-            commit=$(git subtree split --prefix="packages/php/$package")
-            remote="https://x-access-token:${RELEASE_TOKEN}@github.com/frolaxhq/bedrock-${package}.git"
-            git push "$remote" "$commit:refs/heads/main" "$commit:refs/tags/$TAG"
-          done
 
       - name: Tag core package
         env:

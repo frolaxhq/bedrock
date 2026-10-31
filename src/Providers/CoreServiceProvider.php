@@ -26,6 +26,8 @@ class CoreServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->loadViewsFrom($this->packagePath('resources/views'), 'bedrock');
+
         // Testbench can rebuild its configuration repository after providers
         // register, so merge again during boot to keep the defaults available.
         $this->replaceConfigRecursivelyFrom($this->packagePath('config/bedrock.php'), 'bedrock');

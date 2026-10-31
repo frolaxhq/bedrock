@@ -25,6 +25,9 @@ export function AppLayout({ children, ...props }: AppLayoutProps) {
                     navigation={bedrock?.navigation ?? []}
                     viewer={bedrock?.viewer}
                     url={page.url}
+                    logo={
+                        typeof page.props.brandLogo === 'string' ? page.props.brandLogo : undefined
+                    }
                     brand={typeof page.props.name === 'string' ? page.props.name : undefined}
                 >
                     <PanelShell {...props}>{children}</PanelShell>

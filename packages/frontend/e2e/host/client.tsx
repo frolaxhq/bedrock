@@ -1,4 +1,3 @@
-/// <reference path="../../src/runtime/virtual.d.ts" />
 import { createInertiaApp, Head, Link } from '@inertiajs/react';
 import { AppLayout } from '@frolax/bedrock/ui';
 import { ThemeProvider } from '@frolax/bedrock/theme';

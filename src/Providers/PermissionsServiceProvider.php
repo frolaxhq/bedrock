@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Providers;
 
+use Frolax\Bedrock\Console\Commands\Permissions\PermissionsSyncCommand;
 use Frolax\Bedrock\Contracts\Module\ModuleRegistry;
 use Frolax\Bedrock\Contracts\Permissions\ModulePermissions;
 use Frolax\Bedrock\Events\Module\ModuleInstalled;
@@ -30,6 +31,10 @@ class PermissionsServiceProvider extends ServiceProvider
 
     public function boot(Gate $gate): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([PermissionsSyncCommand::class]);
+        }
+
         $gate->before(function (mixed $user, string $ability): ?bool {
             /** @var ModulePermissions $permissions */
             $permissions = $this->app->make(ModulePermissions::class);

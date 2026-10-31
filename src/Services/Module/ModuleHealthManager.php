@@ -26,6 +26,7 @@ class ModuleHealthManager
             || $module->failure_code !== $code
             || $module->failure_reason !== $reason;
 
+        app(CompiledModuleBoot::class)->invalidate();
         $updated = $this->repository->upsert((string) $module->key, [
             'health' => ModuleHealth::Failed,
             'failure_code' => $code,
@@ -47,6 +48,7 @@ class ModuleHealthManager
             return $module;
         }
 
+        app(CompiledModuleBoot::class)->invalidate();
         $updated = $this->repository->upsert((string) $module->key, [
             'health' => ModuleHealth::Healthy,
             'failure_code' => null,

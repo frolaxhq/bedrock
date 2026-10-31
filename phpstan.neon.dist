@@ -6,6 +6,5 @@ parameters:
         - src
         - config
         - database
-        - packages/php
         - modules/audit-log
     tmpDir: build/phpstan

@@ -32,7 +32,7 @@ class DatabaseModuleRunner
      *
      * @throws ModuleDatabaseException
      */
-    public function run(DiscoveredModule $module): void
+    public function run(DiscoveredModule $module, bool $seed = true): void
     {
         $module = new DiscoveredModule($module->key, app(PhpRuntime::class)->root($module->manifest, $module->path), $module->manifest);
 
@@ -40,7 +40,7 @@ class DatabaseModuleRunner
             $this->migrate($module);
         }
 
-        foreach ($this->seeders($module) as $seeder) {
+        foreach ($seed ? $this->seeders($module) : [] as $seeder) {
             $this->seed($module, $seeder);
         }
     }

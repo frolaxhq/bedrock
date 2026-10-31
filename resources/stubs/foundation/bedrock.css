@@ -1,0 +1,4 @@
+@import 'tailwindcss';
+@import '@frolax/bedrock/theme.css';
+@source '../../node_modules/@frolax/bedrock/dist';
+@source '../js';

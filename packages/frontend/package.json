@@ -61,6 +61,10 @@
         "./hooks/*": {
             "types": "./dist/ui/theme/index.d.ts",
             "import": "./dist/ui/theme/index.js"
+        },
+        "./pages": {
+            "types": "./dist/pages/index.d.ts",
+            "import": "./dist/pages/index.js"
         }
     },
     "scripts": {

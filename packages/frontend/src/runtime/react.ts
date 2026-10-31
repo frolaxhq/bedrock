@@ -1,13 +1,7 @@
 import { loadRemote, registerRemotes } from '@module-federation/enhanced/runtime';
 import { Component, type ReactNode } from 'react';
 import { satisfies } from 'semver';
-import type {
-    BedrockPage,
-    BedrockFrontendModule,
-    BedrockSharedProps,
-    PageResolver,
-    ResolvedPage,
-} from './types.js';
+import type { BedrockPage, BedrockFrontendModule, PageResolver, ResolvedPage } from './types.js';
 import {
     prepareNavigation,
     registerNavigationRefresh,

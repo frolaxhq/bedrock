@@ -7,6 +7,7 @@ use Frolax\Bedrock\Contracts\Frontend\FrontendRegistry;
 use Frolax\Bedrock\Contracts\Module\ModuleManager;
 use Frolax\Bedrock\Contracts\Module\ModuleRepository;
 use Frolax\Bedrock\Contracts\Permissions\ModulePermissions;
+use Frolax\Bedrock\DataObjects\Frontend\FrontendModule;
 use Frolax\Bedrock\Enums\Module\ModuleStatus;
 use Frolax\Bedrock\Exceptions\Frontend\InvalidFrontendArtifactException;
 use Frolax\Bedrock\Facades\Frontend as FrontendFacade;
@@ -17,10 +18,12 @@ use Frolax\Bedrock\Services\Frontend\ViewerContextFactory;
 use Frolax\Bedrock\Services\Module\Install\LocalDirectorySource;
 use Frolax\Bedrock\Support\Module\ModuleManifest;
 use Frolax\Bedrock\Testing\Module\ModuleManifestFactory;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Auth\User as BaseUser;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use Workbench\App\Models\User;
 
@@ -261,4 +264,46 @@ it('marks frontend integrity drift unhealthy during reconciliation', function ()
     File::deleteDirectory($sourceRoot);
     File::deleteDirectory($clientRoot);
     File::deleteDirectory($serverRoot);
+});
+
+it('resolves cached navigation against each request and current route defaults', function () {
+    $module = new FrontendModule('portal', '1.0.0', 'inertia-react', '/client', '/server', navigation: [
+        'groups' => [], 'items' => [['key' => 'portal', 'kind' => 'link', 'label' => 'Portal', 'route' => 'portal.index', 'active' => ['portal.*']]],
+    ]);
+    $frontend = Mockery::mock(FrontendRegistry::class);
+    $frontend->shouldReceive('all')->once()->andReturn(collect([$module]));
+    app()->instance(FrontendRegistry::class, $frontend);
+    Route::get('/{locale}/portal', static fn (): string => 'portal')->name('portal.index');
+    Route::get('/other', static fn (): string => 'other')->name('other');
+    app('router')->getRoutes()->refreshNameLookups();
+    $navigation = app(Navigation::class);
+    URL::defaults(['locale' => 'en']);
+    request()->setRouteResolver(static fn () => Route::getRoutes()->getByName('portal.index'));
+    expect($navigation->all()->first())->toMatchArray(['active' => true, 'href' => '/en/portal']);
+    URL::defaults(['locale' => 'bn']);
+    request()->setRouteResolver(static fn () => Route::getRoutes()->getByName('other'));
+    expect($navigation->all()->first())->toMatchArray(['active' => false, 'href' => '/bn/portal']);
+});
+
+it('authorizes module navigation through the Laravel gate without calling user helpers', function () {
+    $module = new FrontendModule('portal', '1.0.0', 'inertia-react', '/client', '/server', navigation: [
+        'groups' => [], 'items' => [['key' => 'action', 'kind' => 'action', 'label' => 'Action', 'permission' => 'view']],
+    ]);
+    $frontend = Mockery::mock(FrontendRegistry::class);
+    $frontend->shouldReceive('all')->once()->andReturn(collect([$module]));
+    app()->instance(FrontendRegistry::class, $frontend);
+    Gate::define('portal.view', static fn (Authenticatable $user): bool => $user->getAuthIdentifier() === 1);
+    $navigation = app(Navigation::class);
+    $user = new class extends BaseUser
+    {
+        public function can($abilities, $arguments = []): bool
+        {
+            throw new LogicException('Navigation should use the Gate contract directly.');
+        }
+    };
+    $user->setAttribute('id', 1);
+    expect($navigation->all($user))->toHaveCount(1);
+    $user->setAttribute('id', 2);
+    expect($navigation->all($user))->toBeEmpty()
+        ->and($navigation->all())->toBeEmpty();
 });

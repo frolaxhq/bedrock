@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 return [
+    'auth' => ['enabled' => false, 'registration' => false],
+    'admin' => ['enabled' => false, 'path' => 'admin', 'navigation' => []],
+    'brand' => ['name' => null, 'logo' => null],
 
     /*
     |--------------------------------------------------------------------------
@@ -29,6 +32,7 @@ return [
     */
 
     'modules' => [
+        'boot' => ['compiled' => false],
         'path' => 'modules',
         'table' => 'modules',
         'manifest' => 'module.json',
@@ -49,12 +53,19 @@ return [
             'offline' => false,
             'toolchain_path' => 'storage/framework/bedrock/module-tools',
             'repositories' => [],
+            'validation' => [
+                'cache' => false,
+                'release' => null,
+                'store' => null,
+                'ttl' => 300,
+            ],
         ],
 
         'operations' => [
             'connection' => null,
             'queue' => 'bedrock-install',
             'timeout' => 1200,
+            'stale_after' => 3600,
         ],
 
         'locks' => [

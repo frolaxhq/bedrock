@@ -10,6 +10,7 @@ use Frolax\Bedrock\DataObjects\Module\Manifest;
 use Frolax\Bedrock\Enums\Module\ModuleStatus;
 use Frolax\Bedrock\Events\Module\ModuleBootFailed;
 use Frolax\Bedrock\Events\Module\ModuleEnabled;
+use Frolax\Bedrock\Events\Module\ModuleUpgraded;
 use Frolax\Bedrock\Services\Administration\AdministrationManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -143,4 +144,11 @@ it('supports UUID actors and prevents edits to recorded entries', function (): v
     $entry = AuditEntry::query()->firstOrFail();
     expect(fn () => $entry->forceFill(['event' => 'rewritten'])->save())->toThrow(LogicException::class)
         ->and(fn () => $entry->delete())->toThrow(LogicException::class);
+});
+
+it('records module upgrades through the audit module', function (): void {
+    event(new ModuleUpgraded('billing', Manifest::from(['key' => 'billing', 'version' => '2.0.0']), '1.0.0'));
+    $entry = DB::table('bedrock_audit_entries')->where('event', 'module.upgraded')->sole();
+    expect($entry->module_key)->toBe('billing')
+        ->and(json_decode($entry->metadata, true, flags: JSON_THROW_ON_ERROR))->toBe(['version' => '2.0.0']);
 });

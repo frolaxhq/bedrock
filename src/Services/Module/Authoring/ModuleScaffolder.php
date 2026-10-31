@@ -111,7 +111,7 @@ class ModuleScaffolder
         }
 
         if ($this->frontend === null) {
-            throw new InvalidModuleSourceException('Install frolaxhq/bedrock-frontend before generating a frontend module.');
+            throw new InvalidModuleSourceException('Install frolaxhq/bedrock before generating a frontend module.');
         }
 
         return $this->frontend->extend($files, $key, $class, $name);

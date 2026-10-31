@@ -142,6 +142,8 @@ it('registers the module commands', function () {
         ->and($commands)->toContain('module:make')
         ->and($commands)->toContain('module:validate')
         ->and($commands)->toContain('module:pack')
+        ->and($commands)->toContain('module:upgrade')
+        ->and($commands)->toContain('module:recover')
         ->and($commands)->toContain('frontend:install')
         ->and($commands)->not->toContain('bedrock:frontend-install')
         ->and($commands)->toContain('bedrock:admin-install')
@@ -165,4 +167,19 @@ it('creates the modules table through its migration', function () {
 it('creates the capability-owned settings and permission catalog tables', function (): void {
     expect(Schema::hasTable('module_settings'))->toBeTrue()
         ->and(Schema::hasTable('module_permissions'))->toBeTrue();
+});
+
+it('integrates module caching with Laravel deployment optimization', function (): void {
+    expect(ServiceProvider::$optimizeCommands['bedrock-modules'])->toBe('module:cache')
+        ->and(ServiceProvider::$optimizeClearCommands['bedrock-modules'])->toBe('module:clear');
+    app()->detectEnvironment(fn (): string => 'production');
+    config()->set('bedrock.modules.bootstrap.enabled', false);
+    config()->set('bedrock.modules.php.validation', ['cache' => true, 'release' => 'deployment']);
+
+    try {
+        (new ModulesServiceProvider(app()))->boot();
+        expect(ServiceProvider::$optimizeCommands['bedrock-modules'])->toBe('module:cache --warm');
+    } finally {
+        app()->detectEnvironment(fn (): string => 'testing');
+    }
 });

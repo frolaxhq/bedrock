@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Frolax\Bedrock\Jobs;
 
-use Frolax\Bedrock\Services\Module\Operations\InstallationException;
+use Frolax\Bedrock\Exceptions\Module\InstallationException;
 use Frolax\Bedrock\Services\Module\Operations\InstallationOperations;
 use Frolax\Bedrock\Services\Module\Operations\InstallationProcess;
 use Illuminate\Bus\Queueable;

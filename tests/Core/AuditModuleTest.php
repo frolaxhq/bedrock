@@ -22,7 +22,7 @@ it('installs a validated audit-log ZIP on core alone and preserves its records o
         $source = new ZipSource(app('files'), $archive);
         app(ModuleManager::class)->installFrom($source, 'audit-log');
         expect(Schema::hasTable('bedrock_audit_entries'))->toBeTrue()
-            ->and(app()->bound(AdminPageRegistry::class))->toBeFalse();
+            ->and(app()->bound(AdminPageRegistry::class))->toBeTrue();
 
         app(ModuleManager::class)->enable('audit-log');
         app(ModuleBootstrapper::class)->bootstrap();

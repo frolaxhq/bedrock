@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Frolax\Bedrock\Services\Module\Operations;
 
 use Frolax\Bedrock\DataObjects\Module\Manifest;
+use Frolax\Bedrock\Exceptions\Module\InstallationException;
 use Frolax\Bedrock\Jobs\InstallModule;
 use Frolax\Bedrock\Models\ModuleInstallation;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Queue\Factory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Throwable;
 
@@ -90,11 +92,37 @@ class InstallationOperations
         return $operation;
     }
 
+    /** Expire abandoned operations without dispatching work or replaying migrations. */
+    public function recover(?string $operationId = null): int
+    {
+        $seconds = max(
+            1,
+            (int) $this->config->get('bedrock.modules.operations.stale_after', 3600),
+            (int) $this->config->get('bedrock.modules.operations.timeout', 1200) + 60,
+            (int) $this->config->get('bedrock.modules.locks.seconds', 1500) + 60,
+        );
+        $cutoff = now()->subSeconds($seconds);
+
+        return ModuleInstallation::query()
+            ->when($operationId !== null, fn (Builder $query): Builder => $query->whereKey($operationId))
+            ->whereNotNull('active_key')
+            ->whereIn('status', ['queued', 'preparing', 'installing'])
+            ->where(function (Builder $query) use ($cutoff): void {
+                $query->where('started_at', '<=', $cutoff)
+                    ->orWhere(function (Builder $query) use ($cutoff): void {
+                        $query->whereNull('started_at')->where('created_at', '<=', $cutoff);
+                    });
+            })->update([
+                'status' => 'failed', 'active_key' => null, 'finished_at' => now(),
+                'error' => 'Installation expired. Inspect running processes and database changes before explicitly installing again; migrations were not retried.',
+            ]);
+    }
+
     /** Atomically claim delivery without permitting migration replay. */
     public function claim(string $operationId): ?ModuleInstallation
     {
         $claimed = ModuleInstallation::query()->whereKey($operationId)
-            ->where('status', 'queued')->whereNull('started_at')
+            ->where('status', 'queued')->whereNotNull('active_key')->whereNull('started_at')
             ->update(['started_at' => now()]);
 
         return $claimed === 1 ? ModuleInstallation::query()->find($operationId) : null;

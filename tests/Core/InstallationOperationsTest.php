@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use Frolax\Bedrock\Contracts\Module\ModuleManager;
+use Frolax\Bedrock\Exceptions\Module\InstallationException;
 use Frolax\Bedrock\Jobs\InstallModule;
 use Frolax\Bedrock\Models\ModuleInstallation;
-use Frolax\Bedrock\Services\Module\Operations\InstallationException;
 use Frolax\Bedrock\Services\Module\Operations\InstallationOperations;
 use Frolax\Bedrock\Services\Module\Operations\InstallationProcess;
 use Illuminate\Contracts\Foundation\Application;
@@ -289,5 +289,54 @@ it('records worker timeout failures without leaking the queue exception', functi
 
     expect($operation->fresh()->status)->toBe('failed')
         ->and($operation->fresh()->error)->not->toContain('private-token')
+        ->and($operations->claim($operation->id))->toBeNull();
+});
+
+it('recovers expired claimed operations without launching another child or replaying migrations', function (string $status): void {
+    $operations = app(InstallationOperations::class);
+    $operation = $operations->schedule('alpha');
+    $operation->forceFill(['started_at' => now()->subHours(2), 'status' => $status])->save();
+    $this->mock(InstallationProcess::class)->shouldNotReceive('run');
+
+    $this->artisan('module:recover', ['operation' => $operation->id])->assertSuccessful();
+    (new InstallModule($operation->id))->handle($operations, app(InstallationProcess::class));
+
+    expect($operation->fresh()->status)->toBe('failed')
+        ->and($operation->fresh()->active_key)->toBeNull()
+        ->and($operation->fresh()->finished_at)->not->toBeNull();
+    expect($operations->schedule('alpha')->id)->not->toBe($operation->id);
+})->with(['queued', 'preparing', 'installing']);
+
+it('recovers expired undelivered operations but leaves recent and terminal records alone', function (): void {
+    $operations = app(InstallationOperations::class);
+    $stale = $operations->schedule('alpha');
+    $stale->forceFill(['created_at' => now()->subHours(2)])->save();
+    $recent = $operations->schedule('beta');
+    $terminal = $operations->schedule('gamma');
+    $operations->fail($terminal->id);
+
+    expect($operations->recover())->toBe(1)
+        ->and($stale->fresh()->status)->toBe('failed')
+        ->and($recent->fresh()->status)->toBe('queued')
+        ->and($terminal->fresh()->status)->toBe('failed')
+        ->and($operations->recover())->toBe(0);
+});
+
+it('does not expire a worker within its configured execution and lock windows', function (): void {
+    config()->set('bedrock.modules.operations.stale_after', 1);
+    $operations = app(InstallationOperations::class);
+    $operation = $operations->schedule('alpha');
+    $operation->forceFill(['started_at' => now()->subMinutes(10), 'status' => 'installing'])->save();
+    expect($operations->recover($operation->id))->toBe(0)
+        ->and($operation->fresh()->active_key)->toBe('alpha');
+});
+
+it('prevents recovered operations from starting or completing after late worker delivery', function (): void {
+    $operations = app(InstallationOperations::class);
+    $operation = $operations->schedule('alpha');
+    $operation->forceFill(['started_at' => now()->subHours(2)])->save();
+    expect($operations->recover($operation->id))->toBe(1);
+    expect(fn () => $operations->start($operation->id, 'alpha'))->toThrow(InstallationException::class)
+        ->and($operations->complete($operation->id))->toBeFalse()
         ->and($operations->claim($operation->id))->toBeNull();
 });

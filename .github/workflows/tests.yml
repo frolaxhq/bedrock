@@ -53,7 +53,9 @@ jobs:
           pnpm --filter @modules/example build
 
       - name: Browser SSR and navigation
-        run: pnpm frontend:e2e
+        run: |
+          pnpm --filter @frolax/bedrock exec playwright install --with-deps chrome
+          pnpm frontend:e2e
 
   tests:
     runs-on: ${{ matrix.os }}
@@ -154,23 +156,21 @@ jobs:
         working-directory: consumer
         run: |
           composer config repositories.bedrock '{"type":"path","url":"..","options":{"versions":{"frolaxhq/bedrock":"1.0.0"}}}'
-          composer config repositories.bedrock-platform '{"type":"path","url":"../packages/php/*","options":{"versions":{"frolaxhq/bedrock-admin":"1.0.0","frolaxhq/bedrock-frontend":"1.0.0","frolaxhq/bedrock-access-spatie":"1.0.0"}}}'
-          composer require frolaxhq/bedrock:^1.0 frolaxhq/bedrock-admin:^1.0 frolaxhq/bedrock-frontend:^1.0 --with-all-dependencies --no-interaction
+          composer require frolaxhq/bedrock:^1.0 --with-all-dependencies --no-interaction
 
-      - name: Prepare local administration
+      - name: Pack the frontend for the consumer
+        run: pnpm --filter @frolax/bedrock exec npm pack --pack-destination "$GITHUB_WORKSPACE/consumer"
+
+      - name: Prepare the complete foundation
         working-directory: consumer
         run: |
-          touch database/database.sqlite
-          php artisan vendor:publish --tag="bedrock-config" --force
-          sed -i '/^use Illuminate.*Notifiable;/a use Spatie\\Permission\\Traits\\HasRoles;' app/Models/User.php
-          sed -i 's/use HasFactory, Notifiable;/use HasFactory, Notifiable, HasRoles;/' app/Models/User.php
-          sed -i "/'administration' => \[/,+1 s/'enabled' => false/'enabled' => true/" config/bedrock.php
-          php artisan bedrock:admin-install || test $? -eq 1
-          php artisan migrate --force
+          npm pkg set "dependencies.@frolax/bedrock=file:$(basename frolax-bedrock-*.tgz)"
+          php ../scripts/consumer-foundation-fixture.php
+          php artisan bedrock:install --skip-admin --no-interaction
+          php artisan bedrock:install --skip-admin --no-interaction
           php artisan tinker --execute="\\App\\Models\\User::query()->create(['name' => 'Admin', 'email' => 'admin@example.test', 'password' => bcrypt('password')]);"
           php artisan bedrock:admin-user admin@example.test
-          php artisan bedrock:admin-install --check
-          php artisan route:list --name=bedrock.admin
+          php artisan bedrock:install --check
 
       - name: Install and enable a local module
         working-directory: consumer
@@ -191,5 +191,18 @@ jobs:
           COMPOSER_ROOT_VERSION: 1.0.x-dev
         run: composer install --no-interaction --prefer-dist --no-scripts
 
-      - name: Verify optional platform combinations
+      - name: Cache the consumer for browser verification
+        working-directory: consumer
+        run: |
+          php artisan config:cache
+          php artisan route:cache
+
+      - name: Verify foundation browser flows
+        env:
+          BEDROCK_CONSUMER_PATH: ${{ github.workspace }}/consumer
+        run: |
+          pnpm --filter @frolax/bedrock exec playwright install --with-deps chrome
+          pnpm --filter @frolax/bedrock exec playwright test --config playwright.foundation.config.ts
+
+      - name: Verify foundation and audit consumers
         run: composer test:consumer

@@ -12,7 +12,7 @@ class ModuleMakeCommand extends ModuleCommand
     protected $signature = 'module:make
         {key : The lowercase module key}
         {--name= : The human-readable module name}
-        {--frontend : Generate frontend source using frolaxhq/bedrock-frontend}
+        {--frontend : Generate frontend source using frolaxhq/bedrock}
         {--backend-only : Generate no frontend source or build configuration}';
 
     protected $description = 'Create a new Bedrock module without registering or installing it';

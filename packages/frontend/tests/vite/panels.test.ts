@@ -68,10 +68,10 @@ describe('panel convention plugin', () => {
         expect(merged.lint?.ignorePatterns).toContain('node_modules/**');
     });
 
-    it('supplies module client and SSR defaults with explicit overrides', async () => {
+    it('supplies module client and SSR defaults with explicit overrides', () => {
         const config = defineModuleConfig({ key: 'example', vite: { server: { port: 5180 } } });
-        const client = await config({ command: 'build', mode: 'production', isSsrBuild: false });
-        const server = await config({ command: 'build', mode: 'production', isSsrBuild: true });
+        const client = config({ command: 'build', mode: 'production', isSsrBuild: false });
+        const server = config({ command: 'build', mode: 'production', isSsrBuild: true });
 
         expect(client.server?.port).toBe(5180);
         expect(client.lint?.options?.typeCheck).toBe(true);

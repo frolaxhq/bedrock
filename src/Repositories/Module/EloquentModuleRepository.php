@@ -8,6 +8,7 @@ use Frolax\Bedrock\Contracts\Module\ModuleRepository;
 use Frolax\Bedrock\Enums\Module\ModuleStatus;
 use Frolax\Bedrock\Exceptions\Module\ModuleNotFoundException;
 use Frolax\Bedrock\Models\Module;
+use Frolax\Bedrock\Services\Module\CompiledModuleBoot;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
@@ -62,6 +63,7 @@ class EloquentModuleRepository implements ModuleRepository
     {
         $module = $this->find($key) ?? new Module(['key' => $key]);
 
+        app(CompiledModuleBoot::class)->invalidate();
         $module->fill($attributes);
         $module->save();
 
@@ -71,6 +73,8 @@ class EloquentModuleRepository implements ModuleRepository
     public function delete(string $key): bool
     {
         $module = $this->find($key);
+
+        app(CompiledModuleBoot::class)->invalidate();
 
         return (bool) $module?->delete();
     }

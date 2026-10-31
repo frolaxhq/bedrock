@@ -52,20 +52,6 @@ try {
     $core = packageJson("{$root}/composer.json");
     assertPackage($core, 'frolaxhq/bedrock', "{$root}/composer.json", false);
 
-    foreach ([
-        'access-spatie' => 'frolaxhq/bedrock-access-spatie',
-        'admin' => 'frolaxhq/bedrock-admin',
-        'frontend' => 'frolaxhq/bedrock-frontend',
-    ] as $directory => $name) {
-        $path = "{$root}/packages/php/{$directory}/composer.json";
-        $package = packageJson($path);
-        assertPackage($package, $name, $path);
-
-        if (($package['require']['frolaxhq/bedrock'] ?? null) !== '^1.0') {
-            throw new RuntimeException("Package [{$name}] must require Bedrock with [^1.0].");
-        }
-    }
-
     $frontend = packageJson("{$root}/packages/frontend/package.json");
 
     if (($frontend['name'] ?? null) !== '@frolax/bedrock') {

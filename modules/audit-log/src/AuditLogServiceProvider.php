@@ -14,6 +14,7 @@ use Frolax\Bedrock\Events\Module\ModuleFailed;
 use Frolax\Bedrock\Events\Module\ModuleInstalled;
 use Frolax\Bedrock\Events\Module\ModuleRecovered;
 use Frolax\Bedrock\Events\Module\ModuleUninstalled;
+use Frolax\Bedrock\Events\Module\ModuleUpgraded;
 use Frolax\Bedrock\Events\Settings\ModuleSettingsChanged;
 use Frolax\Bedrock\Events\Settings\ModuleSettingsReset;
 use Frolax\Bedrock\Providers\Module\ModuleServiceProvider;
@@ -44,11 +45,11 @@ class AuditLogServiceProvider extends ModuleServiceProvider
         foreach ([
             ModuleDiscovered::class => 'module.discovered', ModuleInstalled::class => 'module.installed',
             ModuleEnabled::class => 'module.enabled', ModuleDisabled::class => 'module.disabled',
-            ModuleUninstalled::class => 'module.uninstalled', ModuleRecovered::class => 'module.recovered',
+            ModuleUninstalled::class => 'module.uninstalled', ModuleUpgraded::class => 'module.upgraded', ModuleRecovered::class => 'module.recovered',
             ModuleFailed::class => 'module.failed', ModuleBootFailed::class => 'module.boot_failed',
         ] as $class => $action) {
             Event::listen($class, function (object $event) use ($action): void {
-                /** @var ModuleDiscovered|ModuleInstalled|ModuleEnabled|ModuleDisabled|ModuleUninstalled|ModuleRecovered|ModuleFailed|ModuleBootFailed $event */
+                /** @var ModuleDiscovered|ModuleInstalled|ModuleEnabled|ModuleDisabled|ModuleUpgraded|ModuleUninstalled|ModuleRecovered|ModuleFailed|ModuleBootFailed $event */
                 $metadata = ['version' => $event->manifest->version];
 
                 if ($event instanceof ModuleFailed) {

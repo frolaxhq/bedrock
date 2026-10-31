@@ -106,8 +106,8 @@ export function resolveFrontendPanel(requested: string): ResolvedFrontendPanel {
         key,
         shell: selected?.shell ?? fallback?.shell,
         slots: {
-            ...(fallback?.slots ?? {}),
-            ...(selected?.slots ?? {}),
+            ...fallback?.slots,
+            ...selected?.slots,
         },
     };
 }

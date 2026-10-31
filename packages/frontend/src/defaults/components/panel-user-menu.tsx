@@ -9,6 +9,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuGroup,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
@@ -79,29 +80,31 @@ export function PanelUserMenu({
                     }
                 />
                 <DropdownMenuContent align="start" side="top">
-                    <DropdownMenuLabel>{viewer.name}</DropdownMenuLabel>
-                    {viewer.email && (
-                        <DropdownMenuLabel className="font-normal text-muted-foreground">
-                            {viewer.email}
-                        </DropdownMenuLabel>
-                    )}
-                    <DropdownMenuSeparator />
-                    {viewer.actions.profile && (
-                        <DropdownMenuItem render={<Link href={viewer.actions.profile} />}>
-                            <IconUser aria-hidden="true" />
-                            {profileLabel}
-                        </DropdownMenuItem>
-                    )}
-                    {viewer.actions.logout && (
-                        <DropdownMenuItem
-                            onClick={() => {
-                                router.post(viewer.actions.logout!);
-                            }}
-                        >
-                            <IconLogout aria-hidden="true" />
-                            {logoutLabel}
-                        </DropdownMenuItem>
-                    )}{' '}
+                    <DropdownMenuGroup>
+                        <DropdownMenuLabel>{viewer.name}</DropdownMenuLabel>
+                        {viewer.email && (
+                            <DropdownMenuLabel className="font-normal text-muted-foreground">
+                                {viewer.email}
+                            </DropdownMenuLabel>
+                        )}
+                        <DropdownMenuSeparator />
+                        {viewer.actions.profile && (
+                            <DropdownMenuItem render={<Link href={viewer.actions.profile} />}>
+                                <IconUser aria-hidden="true" />
+                                {profileLabel}
+                            </DropdownMenuItem>
+                        )}
+                        {viewer.actions.logout && (
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    router.post(viewer.actions.logout!);
+                                }}
+                            >
+                                <IconLogout aria-hidden="true" />
+                                {logoutLabel}
+                            </DropdownMenuItem>
+                        )}{' '}
+                    </DropdownMenuGroup>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

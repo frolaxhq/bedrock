@@ -26,14 +26,7 @@ function runConsumerCommand(array $command, string $directory): void
 
 try {
     runConsumerCommand(['composer', 'create-project', 'laravel/laravel', $temporary.'/template', '^13.0', '--no-install', '--no-scripts', '--prefer-dist'], $temporary);
-    $profiles = [
-        'core' => [],
-        'access' => ['access-spatie'],
-        'admin' => ['admin'],
-        'frontend' => ['frontend'],
-        'audit' => [],
-        'full' => ['admin', 'frontend'],
-    ];
+    $profiles = ['foundation' => [], 'audit' => []];
 
     foreach ($profiles as $profile => $packages) {
         $directory = $temporary.'/'.$profile;
@@ -41,16 +34,8 @@ try {
         $composer = json_decode($files->get($directory.'/composer.json'), true, 512, JSON_THROW_ON_ERROR);
         $composer['repositories'] = [[
             'type' => 'path', 'url' => $repository, 'options' => ['versions' => ['frolaxhq/bedrock' => '1.0.0']],
-        ], [
-            'type' => 'path', 'url' => $repository.'/packages/php/*', 'options' => ['versions' => [
-                'frolaxhq/bedrock-admin' => '1.0.0', 'frolaxhq/bedrock-access-spatie' => '1.0.0', 'frolaxhq/bedrock-frontend' => '1.0.0',
-            ]],
         ]];
         $composer['require']['frolaxhq/bedrock'] = '^1.0';
-
-        foreach ($packages as $package) {
-            $composer['require']['frolaxhq/bedrock-'.$package] = '^1.0';
-        }
 
         // The production dependency graph is the subject of this test.
         unset($composer['require-dev']);
@@ -58,17 +43,14 @@ try {
         runConsumerCommand(['composer', 'update', '--no-dev', '--no-scripts', '--prefer-dist', '--no-progress'], $directory);
         $files->put($directory.'/database/database.sqlite', '');
         $files->put($directory.'/.env', "APP_ENV=testing\nAPP_KEY=base64:".base64_encode(str_repeat('a', 32))."\nDB_CONNECTION=sqlite\nDB_DATABASE=".$directory."/database/database.sqlite\nCACHE_STORE=array\nSESSION_DRIVER=array\n");
-        $admin = in_array('admin', $packages, true);
+        $admin = true;
         $config = ['core' => ['version' => '1.0.0'], 'administration' => ['enabled' => $admin]];
         $files->put($directory.'/config/bedrock.php', "<?php\nreturn ".var_export($config, true).";\n");
         runConsumerCommand([PHP_BINARY, 'artisan', 'package:discover'], $directory);
 
-        if ($admin) {
-            $user = $files->get($directory.'/app/Models/User.php');
-            $user = str_replace('use HasFactory, Notifiable;', 'use HasFactory, Notifiable, \\Spatie\\Permission\\Traits\\HasRoles;', $user);
-            $files->put($directory.'/app/Models/User.php', $user);
-            runConsumerCommand([PHP_BINARY, 'artisan', 'vendor:publish', '--provider=Spatie\\Permission\\PermissionServiceProvider', '--tag=permission-migrations'], $directory);
-        }
+        $files->delete($directory.'/config/bedrock.php');
+        runConsumerCommand([PHP_BINARY, 'artisan', 'bedrock:install', '--skip-frontend', '--skip-admin', '--no-interaction'], $directory);
+        runConsumerCommand([PHP_BINARY, 'artisan', 'bedrock:install', '--skip-frontend', '--skip-admin', '--no-interaction'], $directory);
 
         runConsumerCommand([PHP_BINARY, 'artisan', 'migrate', '--force'], $directory);
         $audit = in_array($profile, ['audit', 'full'], true);
@@ -88,7 +70,7 @@ try {
         $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
         [$profile, $hasAdmin, $hasFrontend, $hasAccess, $hasAudit] = array_slice($argv, 1);
         foreach ([
-            'frolaxhq/bedrock-admin' => $hasAdmin,
+            'frolaxhq/bedrock' => $hasAdmin,
             'inertiajs/inertia-laravel' => $hasFrontend,
             'spatie/laravel-permission' => $hasAccess,
         ] as $package => $expected) {
@@ -125,11 +107,11 @@ try {
         echo $profile." passed\n";
         PHP;
         $files->put($directory.'/probe.php', $probe);
-        runConsumerCommand([PHP_BINARY, $directory.'/probe.php', $profile, $admin ? '1' : '0', in_array('frontend', $packages, true) ? '1' : '0',
-            ($admin || in_array('access-spatie', $packages, true)) ? '1' : '0', $audit ? '1' : '0'], $directory);
+        runConsumerCommand([PHP_BINARY, $directory.'/probe.php', $profile, $admin ? '1' : '0', '1',
+            '1', $audit ? '1' : '0'], $directory);
         echo 'Consumer '.$profile." passed.\n";
 
-        if ($profile === 'core') {
+        if ($profile === 'foundation') {
             foreach (['build', 'enabled', 'disable', 'disabled', 'cleanup'] as $action) {
                 runConsumerCommand([PHP_BINARY, $repository.'/scripts/consumer-php-runtime.php', $action], $directory);
             }
@@ -145,5 +127,9 @@ try {
         }
     }
 } finally {
-    $files->deleteDirectory($temporary);
+    if (getenv('BEDROCK_KEEP_CONSUMER') === '1') {
+        echo 'Consumer directory: '.$temporary."\n";
+    } else {
+        $files->deleteDirectory($temporary);
+    }
 }

@@ -24,6 +24,9 @@ interface ModuleManager
      */
     public function install(string $key): bool;
 
+    /** Upgrade deployed code for an inactive installed module. */
+    public function upgrade(string $key): bool;
+
     /**
      * Install a module from a source into the module root and register it.
      */

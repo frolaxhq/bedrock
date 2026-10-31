@@ -15,8 +15,10 @@ use Frolax\Bedrock\Console\Commands\Module\ModuleListCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleMakeCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModulePackCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModulePrepareCommand;
+use Frolax\Bedrock\Console\Commands\Module\ModuleRecoverCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleSyncCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleUninstallCommand;
+use Frolax\Bedrock\Console\Commands\Module\ModuleUpgradeCommand;
 use Frolax\Bedrock\Console\Commands\Module\ModuleValidateCommand;
 use Frolax\Bedrock\Contracts\Module\ComposerRequirementChecker;
 use Frolax\Bedrock\Contracts\Module\ModuleAutoloader;
@@ -35,6 +37,7 @@ use Frolax\Bedrock\Services\Module\Authoring\ModuleScaffolder;
 use Frolax\Bedrock\Services\Module\Authoring\ModuleSourceValidator;
 use Frolax\Bedrock\Services\Module\CachedModuleRegistry;
 use Frolax\Bedrock\Services\Module\CacheModuleOperationLock;
+use Frolax\Bedrock\Services\Module\CompiledModuleBoot;
 use Frolax\Bedrock\Services\Module\ComposerModuleAutoloader;
 use Frolax\Bedrock\Services\Module\DependencyResolver;
 use Frolax\Bedrock\Services\Module\DirectoryModuleDiscoverer;
@@ -67,6 +70,8 @@ class ModulesServiceProvider extends ServiceProvider
      * @var list<class-string>
      */
     protected array $commands = [
+        ModuleRecoverCommand::class,
+        ModuleUpgradeCommand::class,
         ModuleCacheCommand::class,
         ModuleClearCommand::class,
         ModuleDisableCommand::class,
@@ -88,6 +93,7 @@ class ModulesServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->scoped(CompiledModuleBoot::class);
         $this->app->singleton(ModuleRepository::class, EloquentModuleRepository::class);
         $this->app->singleton(VersionConstraint::class);
         $this->app->singleton(DependencyResolver::class);
@@ -184,6 +190,15 @@ class ModulesServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands($this->commands);
+            $release = $this->app->make('config')->get('bedrock.modules.php.validation.release');
+            $warm = $this->app->isProduction()
+                && (bool) $this->app->make('config')->get('bedrock.modules.php.validation.cache', false)
+                && is_string($release) && trim($release) !== '';
+            $this->optimizes(
+                optimize: $warm ? 'module:cache --warm' : 'module:cache',
+                clear: 'module:clear',
+                key: 'bedrock-modules',
+            );
         }
 
         if (! (bool) $this->app->make('config')->get('bedrock.modules.bootstrap.enabled', true)) {

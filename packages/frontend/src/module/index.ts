@@ -171,7 +171,7 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
     const navigation = definition.navigation ?? defineNavigation({ items: [] });
 
     return {
-        async resolvePage(name: string) {
+        async resolvePage(this: void, name: string) {
             const normalized = `./pages/${name.replace(/^\/+/, '')}.tsx`;
             const page = definition.pages[normalized];
 
@@ -182,7 +182,7 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
             return page();
         },
 
-        async describeNavigation(): Promise<NavigationDescriptor> {
+        async describeNavigation(this: void): Promise<NavigationDescriptor> {
             const value = await materialize(navigation);
 
             validate(value);
@@ -196,11 +196,14 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
             };
         },
 
-        materializeNavigation(): Promise<NavigationDefinitionValue> {
+        materializeNavigation(this: void): Promise<NavigationDefinitionValue> {
             return materializeNavigation(navigation);
         },
 
-        async resolveNavigation(context: NavigationContext): Promise<NavigationResolution> {
+        async resolveNavigation(
+            this: void,
+            context: NavigationContext,
+        ): Promise<NavigationResolution> {
             const value = await materialize(navigation);
 
             validate(value);
@@ -214,7 +217,11 @@ export function defineBedrockModule(definition: BedrockModuleDefinition) {
             };
         },
 
-        async runNavigationAction(key: string, context: NavigationContext): Promise<void> {
+        async runNavigationAction(
+            this: void,
+            key: string,
+            context: NavigationContext,
+        ): Promise<void> {
             const value = await materialize(navigation);
             const action = flatten(value.items).find(
                 (item): item is NavigationActionDefinition =>

@@ -23,10 +23,11 @@ export type { NavigationContext } from '../module/index.js';
 
 export interface NavigationRuntime {
     resolveNavigation(
+        this: void,
         context: NavigationContext,
     ): Promise<NavigationResolution> | NavigationResolution;
-    runNavigationAction(key: string, context: NavigationContext): Promise<void> | void;
-    materializeNavigation?(): Promise<NavigationDefinitionValue>;
+    runNavigationAction(this: void, key: string, context: NavigationContext): Promise<void> | void;
+    materializeNavigation?(this: void): Promise<NavigationDefinitionValue>;
 }
 
 export interface NavigationPreparationOptions {
@@ -112,7 +113,10 @@ export function NavigationProvider({
     return createElement(NavigationReactContext.Provider, { value: resolution }, children);
 }
 
-export function useNavigationAction(key: string): { loading: boolean; run(): Promise<void> } {
+export function useNavigationAction(key: string): {
+    loading: boolean;
+    run(this: void): Promise<void>;
+} {
     useRevision();
 
     return {
@@ -121,7 +125,7 @@ export function useNavigationAction(key: string): { loading: boolean; run(): Pro
     };
 }
 
-export async function runNavigationAction(key: string): Promise<void> {
+export async function runNavigationAction(this: void, key: string): Promise<void> {
     const current = store();
     const action = current.actions.get(key);
 
@@ -203,6 +207,10 @@ export async function prepareNavigation(
         }
 
         for (const [key, envelope] of byModule) {
+            if (key === '@host') {
+                resolutions.push(staticResolution(key, envelope, []));
+                continue;
+            }
             const runtime = await loadModule(key);
             const context = contextFor('module', key, page, controller.signal, notifier);
 
@@ -306,7 +314,7 @@ async function rebind(
         const modules = new Set(
             snapshot.items
                 .map((item) => item.module)
-                .filter((module): module is string => Boolean(module)),
+                .filter((module): module is string => Boolean(module) && module !== '@host'),
         );
 
         for (const key of modules) {

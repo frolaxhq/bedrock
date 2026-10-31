@@ -3,6 +3,7 @@ import { cn } from 'cn';
 
 export interface PanelBrandProps extends React.ComponentProps<'div'> {
     name?: string;
+    logo?: string;
 }
 
 /**
@@ -10,7 +11,7 @@ export interface PanelBrandProps extends React.ComponentProps<'div'> {
  * Inertia; hosts override it through the `components/panel-brand`
  * convention for logos and wordmarks.
  */
-export function PanelBrand({ className, name, ...props }: PanelBrandProps) {
+export function PanelBrand({ className, name, logo, ...props }: PanelBrandProps) {
     const label = name && name !== '' ? name : 'Bedrock';
 
     return (
@@ -22,6 +23,7 @@ export function PanelBrand({ className, name, ...props }: PanelBrandProps) {
             )}
             {...props}
         >
+            {logo && <img src={logo} alt="" className="size-8 object-contain" />}
             <span className="truncate" title={label}>
                 {label}
             </span>

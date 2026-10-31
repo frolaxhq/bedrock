@@ -22,8 +22,8 @@ const ui = generateUi(
 await synchronize(catalogFile, catalog);
 await synchronize(generatedUi, ui);
 
-// The optional PHP package ships these sources for ui:override without Node at runtime.
-const phpAssets = path.resolve(packageRoot, '../php/frontend/resources/frontend');
+// The PHP package ships these sources for ui:override without Node at runtime.
+const phpAssets = path.resolve(packageRoot, '../../resources/frontend');
 await synchronize(path.join(phpAssets, 'catalog.json'), catalog);
 for (const file of files) {
     await synchronize(path.join(phpAssets, relative(file)), await readFile(file, 'utf8'));
@@ -75,7 +75,7 @@ function validateEntries(catalogEntries) {
 
 function generateUi(uiFiles) {
     const configPath = path.join(packageRoot, 'tsconfig.json');
-    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    const config = ts.readConfigFile(configPath, (file) => ts.sys.readFile(file));
 
     if (config.error) {
         throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));

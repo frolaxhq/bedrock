@@ -24,13 +24,8 @@ packages; each one is a folder with a `module.json` manifest.
 - check whether the `modules` table or a `module:*` command namespace is already in use
   before installing, since Bedrock registers both
 
-For a new application, prefer the official core-only starter when it is available:
-
-```bash
-laravel new new-project --using=frolaxhq/bedrock-starter
-```
-
-Add only the optional integrations and modules the application actually needs after creation.
+Start from a fresh Laravel application and run `bedrock:install` to prepare auth,
+admin and shared UI. Add business modules as needed. See `docs/foundation.md`.
 
 ### 2. Install and publish
 
@@ -44,18 +39,16 @@ The `bedrock` tag publishes the same configuration file. The `modules` migration
 from the package and is not publishable, so never copy it into the application's migrations
 directory.
 
-Core does not require Inertia or Spatie Permission. Select optional Composer packages:
-`frolaxhq/bedrock-access-spatie` for Spatie grants/roles, `frolaxhq/bedrock-admin` for the
-Blade console (includes that adapter), and `frolaxhq/bedrock-frontend` for Inertia, module
-artifacts, navigation, and frontend authoring. The npm `@frolax/bedrock` package supplies
-React/UI/Vite+ tooling separately. Keep authentication and the User model in the host.
-
-When migrating an all-in-one Bedrock host, require its used companion packages in the
-same Composer update as core. Preserve published configuration, User traits, existing
-tables, grants, and module data; never force-republish or duplicate old migrations. Enable
-`bedrock.administration.enabled` explicitly for the authenticated console. Public PHP
-class and command names remain available from their owning packages. Keep the npm entry
-point `@frolax/bedrock/vite`; request `module:make --frontend` for React modules.
+Bedrock includes PHP authentication, administration, access and frontend integration.
+For a fresh Laravel application run `php artisan bedrock:install`; it prepares the User
+model, migrations, frontend and first administrator. Use `--dry-run` to inspect changes,
+`--check` for readiness, and `--skip-frontend --skip-admin` to defer those explicit steps.
+Auth routes and `/admin` are enabled by the installer; registration stays disabled.
+Installer preflight rejects conflicting route paths/names, incompatible guards and
+package metadata/toolchain conflicts before writing files. Resolve those conflicts
+or integrate manually; do not overwrite application customizations.
+Configure mail for reset/verification. Read `docs/foundation.md` for existing-app integration.
+The host owns its User model and business code. `@frolax/bedrock` supplies React UI/tooling.
 
 ### 3. Configure
 
@@ -116,6 +109,23 @@ locked sources instead; installation prepares/downloads locked dependencies when
 installation. Missing/stale locks and unsupported scoping must be repaired by the author.
 Never expose private SDK classes across module boundaries or modify host Composer files
 to resolve a private SDK. Shared host integrations still require explicit host installation.
+Use `module:recover {operation?}` to expire abandoned installation operations without
+replaying migrations. Eligibility uses `modules.operations.stale_after` (3600 seconds by
+default), bounded below by the configured subprocess and lock windows plus 60 seconds.
+Stop surviving child processes and inspect partial migration/seeder effects before an
+explicit retry. Schedule recovery explicitly if unattended cleanup is needed.
+
+For upgrades, disable enabled dependents and the target, drain jobs, deploy the complete
+new module directory at its existing path, then run `module:upgrade {key} --offline` in a
+fresh Artisan process. The version must increase and all registered dependent constraints
+must accept it. Required modules must already be installed and healthy. Upgrades preserve
+inactive lifecycle state, run pending migrations without installation seeders, publish
+artifacts, sync permissions, and emit `ModuleUpgraded`. The gateway exposes
+`Module::upgrade($key)` for fresh processes. Inspect partial database/artifact changes on
+failure; the command does not roll them back. Rebuild caches, reload workers/SSR, then
+explicitly re-enable the module and its dependents. ZIP replacement and downgrades are not
+part of this command.
+
 Admin installs require an asynchronous `bedrock-install` worker and show operation status;
 `sync` queues are rejected. Failed migrations require explicit repair/retry. Ready-built
 runtime ZIPs need neither Composer nor internet. Old Composer-less modules remain supported.
@@ -232,7 +242,7 @@ with one part of the capability.
 
 ### 8. Operate the administration console
 
-After installing `frolaxhq/bedrock-admin` and setting `bedrock.administration.enabled` to
+After setting `bedrock.administration.enabled` to
 `true`, Bedrock provides a package-owned console at `/bedrock/admin` for authenticated users
 with the configured `bedrock.admin` permission. Prepare Spatie's tables and `HasRoles` on
 the configured user model, run `php artisan bedrock:admin-install`, and grant an existing
@@ -264,7 +274,7 @@ Direct Spatie API calls are not automatically observed.
 ### 9. Author and package a full-stack module
 
 ```bash
-composer require frolaxhq/bedrock-frontend
+composer require frolaxhq/bedrock
 php artisan module:make billing --frontend
 cd modules/billing
 vp install
@@ -275,7 +285,7 @@ php artisan module:pack billing --output=dist/modules
 ```
 
 `module:make billing` defaults to backend-only; `--backend-only` remains supported.
-`--frontend` requires the optional frontend package. Generation only creates
+`--frontend` uses the included frontend integration. Generation only creates
 files; it does not sync, migrate, install, or enable anything. `module:pack` requires an
 existing frontend package-manager lockfile, runs the declared frontend build without installing npm dependencies,
 creates a deterministic ZIP, and validates that ZIP through the same hardened installer.
@@ -294,7 +304,7 @@ Node 24 LTS, and Vite+ 1.0. Run `vp migrate` at the application root before inte
 an existing Vite host. On a recognized React starter-kit layout:
 
 ```bash
-composer require frolaxhq/bedrock-frontend
+composer require frolaxhq/bedrock
 php artisan frontend:install --check
 php artisan frontend:install --dry-run
 php artisan frontend:install
@@ -394,14 +404,16 @@ Frontend::page('billing', 'Invoices/Index');
 | `module:list` | List registered modules with version, status and path. |
 | `module:sync` | Reconcile the registry with the modules found on disk. |
 | `module:doctor {key?} {--json}` | Run operational checks with human or stable JSON output. |
-| `module:make {key} {--frontend} {--backend-only}` | Generate backend-only by default; request frontend source using the optional frontend package. |
+| `module:make {key} {--frontend} {--backend-only}` | Generate backend-only by default; request frontend source using the included frontend integration. |
 | `module:validate {source} {--json}` | Validate source and artifacts without executing module code. |
 | `module:pack {key-or-path} {--output=}` | Build from installed dependencies and create a deterministic validated ZIP. |
 | `module:install {key}` | Register a module directory that already exists. |
+| `module:upgrade {key} {--offline}` | Upgrade deployed code for an inactive installed module; pending migrations only. |
+| `module:recover {operation?}` | Expire abandoned installations without replaying migrations. |
 | `module:uninstall {key}` | Remove verified module code and its registry row while retaining data and published resources. |
 | `module:enable {key}` | Activate a registered module. |
 | `module:disable {key}` | Deactivate a module without removing files or data. |
-| `module:cache` | Rebuild the cached registry. |
+| `module:cache {--warm}` | Rebuild the registry; optionally fully verify and warm production loading descriptors. |
 | `module:clear` | Clear the cached registry. |
 | `frontend:install {--check} {--dry-run}` | Integrate a recognized Laravel React host without running npm. |
 | `ui:override {target?} {--list}` | List or seed a conventional host frontend override. |
@@ -424,7 +436,7 @@ Discovered → Installed → Enabled → Disabled
 ```
 
 Listen for the lifecycle events to react to state changes:
-`ModuleDiscovered`, `ModuleInstalled`, `ModuleEnabled`, `ModuleDisabled`,
+`ModuleDiscovered`, `ModuleInstalled`, `ModuleUpgraded`, `ModuleEnabled`, `ModuleDisabled`,
 `ModuleUninstalled`, `ModuleFailed`, `ModuleRecovered` and `ModuleBootFailed`. The last event
 is reserved for runtime provider registration failures.
 
@@ -504,3 +516,58 @@ $path = ModuleManifestFactory::for('demo')
 - Do not hand-edit recognized host entry files when `frontend:install` can compose
   them safely; if it refuses a layout, follow its manual guidance instead of forcing edits.
 - Do not document package internals here; keep the skill focused on adoption in Laravel apps.
+
+
+## Immutable production PHP validation
+
+Full validation remains the default. Only for immutable production releases, configure
+`bedrock.modules.php.validation.cache=true`, a unique non-empty `release` ID per deployment,
+a trusted optional cache `store`, and `ttl` (default 300 seconds). Rebuild config caches and
+reload workers. Never mutate files within a cached release; rotate the release ID whenever
+code changes. Cache hits skip source/runtime inventory hashing until expiry; arbitrary
+in-place edits are not immediately detected. Descriptor keys include manifest/Composer/runtime/autoload metadata and PHP/extension
+versions. Verified absolute maps skip repeated private graph parsing and path resolution;
+shared host requirements remain checked. Missing/unavailable cache falls back to full checks. Explicit
+validation, prepare/install/upgrade and `module:doctor` remain strict. Run diagnostics and
+`module:cache --warm` before serving traffic. Warming always fully validates; use the same
+release ID, paths, PHP/extensions and cache store as serving workers. Keep caching disabled for mutable deployments.
+
+Laravel's `artisan optimize` warms descriptors automatically when production validation
+caching and a release ID are configured; otherwise it caches the registry only.
+`optimize:clear` includes registry clearing. Keep source/runtime files immutable and rotate
+the release ID on every deployment; warming is a full check even for existing receipts.
+
+## Compiled production boot
+
+Opt in with `bedrock.modules.boot.compiled=true`, production environment, validation
+cache enabled, and a fresh validation release ID for every deployment/host dependency
+change. Prepare runtimes then run `module:cache --warm`; Laravel optimize also warms.
+Warming strictly validates and publishes generation-specific PHP boot artifacts.
+Runtime requests check shared generation, PHP and required extension versions and
+execute all providers, without module fingerprints or manifest hydration. Source
+changes require a new release and rebuild. Trusted cache/artifact storage is required.
+Lifecycle writes/health changes/registry clears invalidate artifacts; successful
+manager operations attempt rebuild. Cache read outages or absent artifacts use strict
+boot. Cache invalidation outages block lifecycle writes. Multi-node deployments need
+a shared registry cache store/key and a local warm artifact on every node after changes.
+Rollback with a new release ID; do not update the database directly or reuse artifact
+filenames with OPcache timestamp validation disabled.
+
+Compiled mode uses an incremental Composer module classmap loader alongside the
+host loader; inspect all loaders when inspecting classmap metadata. It preserves
+callback order, module/file order and host mapping overrides. Every provider still
+registers and boots through Laravel. Conventional view/lang directory checks may be
+cached during warming; custom filesystem implementations and changed paths fall
+back to ordinary checks. Rewarm under a fresh release ID for updated boot artifacts.
+
+Compiled provider resource lookups reuse the snapshot already accepted for the current
+request. Environment/release/generation validation runs when accepting the snapshot,
+rather than repeating configuration checks for every view/lang directory. Rejected
+reads and lifecycle invalidation clear resource metadata; custom filesystem checks
+and all provider hooks retain their normal behavior.
+
+Compiled boot artifact format 3 stores classmaps in immutable namespace groups.
+Requests activate each module’s groups in order without expanding every SDK class
+into a new PHP array. Host collisions and later overrides retain their normal
+behavior, and metadata tooling can still call the module loader’s `getClassMap()`.
+Formats 1 and 2 remain readable; warm a fresh release to obtain grouped maps.

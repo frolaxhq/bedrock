@@ -72,8 +72,14 @@ class Module
     }
 
     /**
-     * Register a module that already exists in the module root.
+     * Upgrade deployed code for an inactive installed module.
      */
+    public function upgrade(string $key): bool
+    {
+        return $this->manager->upgrade($key);
+    }
+
+    /** Register a module that already exists in the module root. */
     public function install(string $key): bool
     {
         return $this->manager->install($key);

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 use Frolax\Bedrock\BedrockServiceProvider;
 use Frolax\Bedrock\Providers\Module\ModuleServiceProvider;
+use Frolax\Bedrock\Services\Module\CompiledModuleBoot;
+use Illuminate\Console\Command;
+use Illuminate\Filesystem\Filesystem;
 
-arch()->preset()->php();
+// Compiled deployment artifacts intentionally export verified scalar arrays as PHP.
+arch()->preset()->php()->ignoring(CompiledModuleBoot::class);
 
 arch()->preset()->security();
 
@@ -59,4 +63,27 @@ it('keeps the module extension point in its own directory and unregistered', fun
     // Abstract, because a module extends it; unregistered, because it is not wiring.
     expect($reflection->isAbstract())->toBeTrue()
         ->and(bedrockRegisteredProviders())->not->toContain($reflection->getName());
+});
+
+it('keeps framework entry points and exceptions in their conventional namespaces', function () {
+    foreach ((new Filesystem)->allFiles(__DIR__.'/../src') as $file) {
+        $relative = str_replace(DIRECTORY_SEPARATOR, '\\', $file->getRelativePathname());
+        $class = 'Frolax\\Bedrock\\'.substr($relative, 0, -4);
+
+        if (! class_exists($class)) {
+            continue;
+        }
+
+        if (is_subclass_of($class, Command::class)) {
+            expect($class)->toStartWith('Frolax\\Bedrock\\Console\\Commands\\');
+        }
+
+        if (str_ends_with($class, 'Controller')) {
+            expect($class)->toStartWith('Frolax\\Bedrock\\Http\\Controllers\\');
+        }
+
+        if (is_subclass_of($class, Throwable::class)) {
+            expect($class)->toStartWith('Frolax\\Bedrock\\Exceptions\\');
+        }
+    }
 });

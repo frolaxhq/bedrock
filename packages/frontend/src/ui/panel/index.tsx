@@ -38,12 +38,13 @@ export interface PanelContextValue {
     viewer: BedrockViewer | null;
     url: string;
     brand: string;
+    logo?: string;
     sidebarCollapsed: boolean;
     mobileSidebarOpen: boolean;
-    setSidebarCollapsed(collapsed: boolean): void;
-    setMobileSidebarOpen(open: boolean): void;
-    toggleSidebar(): void;
-    hasSlot(name: string): boolean;
+    setSidebarCollapsed(this: void, collapsed: boolean): void;
+    setMobileSidebarOpen(this: void, open: boolean): void;
+    toggleSidebar(this: void): void;
+    hasSlot(this: void, name: string): boolean;
 }
 
 interface InternalPanelContextValue extends PanelContextValue {
@@ -59,6 +60,7 @@ export interface PanelProviderProps {
     viewer?: BedrockViewer | null;
     url?: string;
     brand?: string;
+    logo?: string;
 }
 
 export interface PanelShellProps extends HTMLAttributes<HTMLDivElement> {
@@ -83,6 +85,7 @@ export function PanelProvider({
     viewer = null,
     url = '/',
     brand = 'Bedrock',
+    logo,
 }: PanelProviderProps) {
     const requestedPanel = validPanelKey(panel) ? panel : 'default';
     const resolved = useFrontendPanel(requestedPanel);
@@ -130,6 +133,7 @@ export function PanelProvider({
             viewer,
             url,
             brand,
+            logo,
             sidebarCollapsed,
             mobileSidebarOpen,
             setSidebarCollapsed,
@@ -147,6 +151,7 @@ export function PanelProvider({
             viewer,
             url,
             brand,
+            logo,
             preferenceReady,
             requestedPanel,
             resolved.key,
@@ -361,7 +366,10 @@ function PanelSidebarRegions() {
                 data-slot="panel-sidebar-header"
                 className="shrink-0 border-b border-sidebar-border"
             >
-                <PanelSlot name="sidebar-header" fallback={<PanelBrand name={panel.brand} />} />
+                <PanelSlot
+                    name="sidebar-header"
+                    fallback={<PanelBrand name={panel.brand} logo={panel.logo} />}
+                />
             </div>
             <div data-slot="panel-sidebar-content" className="min-h-0 flex-1 overflow-y-auto">
                 <PanelSlot name="sidebar" fallback={<PanelNavigation />} />
