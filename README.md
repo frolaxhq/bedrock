@@ -18,9 +18,9 @@ your project's business features in the host application or reusable modules.
 
 - PHP 8.5 or newer
 - Laravel 13
-- Node 24 LTS (`^24.11.0`) only when integrating the host frontend or authoring modules
+- Node 26 LTS (`^26.13.0`) only when integrating the host frontend or authoring modules
 - Vite+ 1.0 for frontend development; backend-only hosts need no Node runtime in production
-- Node 24 LTS in production only when the host enables Inertia SSR
+- Node 26 LTS in production only when the host enables Inertia SSR
 
 ## Installation
 
@@ -33,7 +33,7 @@ php artisan bedrock:install
 
 The installer prepares authentication, the existing User model, permission migrations,
 React/Inertia assets and `/admin`. It runs migrations and the frontend build, then
-prompts to create an administrator. Node 24.11+ and npm are needed for the build.
+prompts to create an administrator. Node 26.13+ and npm are needed for the build.
 Configure mail delivery for password resets and email verification.
 
 ```bash
@@ -586,7 +586,7 @@ performed by disable/uninstall.
 ## Frontend host integration
 
 Bedrock supports the Laravel 13 React stack: React 19, Inertia 3, TypeScript, Tailwind 4,
-and Vite+ 1.0. Use Node 24 LTS. In an existing host, run the [Vite+ migration](https://viteplus.dev/guide/migrate)
+and Vite+ 1.0. Use Node 26 LTS. In an existing host, run the [Vite+ migration](https://viteplus.dev/guide/migrate)
 at the application root first. Then let the safe installer compose the host Inertia
 resolver and Vite+ configuration:
 

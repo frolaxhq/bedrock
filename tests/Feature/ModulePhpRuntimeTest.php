@@ -506,13 +506,14 @@ it('warms conventional provider resources while leaving unknown paths dynamic', 
         $this->artisan('module:cache', ['--warm' => true])->assertSuccessful();
         $boot = app(CompiledModuleBoot::class);
         expect($boot->read())->not->toBeNull();
+        expect($boot->resourceExists($manifest->provider, str_replace('/', '\\', $path.'/src/../resources/views')))->toBeTrue();
         expect($boot->resourceExists($manifest->provider, $path.'/src/../resources/views'))->toBeTrue()
             ->and($boot->resourceExists($manifest->provider, $path.'/src/../lang'))->toBeFalse()
             ->and($boot->resourceExists($manifest->provider, $path.'/custom/views'))->toBeNull();
         $files = Mockery::mock(Filesystem::class)->makePartial();
         $files->shouldReceive('isDirectory')->andReturn(false)->byDefault();
-        $files->shouldReceive('isDirectory')->with($path.'/src/../resources/views')->once()->andReturn(false);
-        $files->shouldReceive('isDirectory')->with($path.'/src/../lang')->once()->andReturn(false);
+        $files->shouldReceive('isDirectory')->with(Mockery::on(fn (string $candidate): bool => str_replace('\\', '/', $candidate) === str_replace('\\', '/', $path.'/src/../resources/views')))->once()->andReturn(false);
+        $files->shouldReceive('isDirectory')->with(Mockery::on(fn (string $candidate): bool => str_replace('\\', '/', $candidate) === str_replace('\\', '/', $path.'/src/../lang')))->once()->andReturn(false);
         app()->instance('files', $files);
         app(ModuleBootstrapper::class)->bootstrap();
         expect(app()->getProvider($manifest->provider))->not->toBeNull();

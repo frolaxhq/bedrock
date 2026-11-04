@@ -76,7 +76,7 @@ class FrontendModuleScaffold implements ModuleFrontendScaffold
                 'react-dom' => '^19.3.0',
             ],
             'devDependencies' => [
-                '@types/node' => '^24.19.1',
+                '@types/node' => '^26.6.6',
                 '@types/react' => '^19.3.0',
                 '@types/react-dom' => '^19.3.0',
                 'tailwindcss' => '^4.3.3',
@@ -84,7 +84,7 @@ class FrontendModuleScaffold implements ModuleFrontendScaffold
                 'vite' => 'npm:@voidzero-dev/vite-plus-core@1.0.0',
                 'vite-plus' => '1.0.0',
             ],
-            'engines' => ['node' => '^24.11.0'],
+            'engines' => ['node' => '^26.13.0'],
             'packageManager' => 'pnpm@10.34.6',
             'pnpm' => [
                 'overrides' => [

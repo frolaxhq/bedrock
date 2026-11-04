@@ -2,7 +2,7 @@
 
 ## Fresh Laravel application
 
-Use Laravel 13, PHP 8.5+, Node 24.11+ (24 LTS), npm, a configured database and a mail
+Use Laravel 13, PHP 8.5+, Node 26.13+ (26 LTS), npm, a configured database and a mail
 transport. Install `frolaxhq/bedrock` and run `php artisan bedrock:install`.
 The installer prepares files, runs migrations, installs/builds frontend dependencies
 and prompts for the first administrator. It never creates a default password.
@@ -19,7 +19,9 @@ remaining integration steps manually rather than deleting customizations to reru
 Preflight checks reject conflicting auth/admin route names or paths, incompatible
 password/permission guards, and malformed package metadata before writing files.
 The generated frontend uses aligned Vite+ 1.0.0 packages; an existing incompatible
-Vite+ version requires manual integration.
+Vite+ version requires manual integration. Generated npm overrides keep Vitest at
+5.0.1 to match the Vite+ 1.0.0 browser testing peers; conflicting existing Vitest
+dependencies or overrides require manual alignment before installation.
 
 Use `npm run bedrock:dev` during development. The package's root Blade view loads
 `resources/js/bedrock.tsx` and `resources/css/bedrock.css`. The dedicated

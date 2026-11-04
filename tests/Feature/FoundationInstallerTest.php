@@ -17,6 +17,8 @@ it('prepares a fresh application repeatably and refuses edited generated files',
         expect($installer->inspect()['problems'])->toBe([]);
         expect($files->exists($root.'/config/bedrock.php'))->toBeFalse();
         $installer->install();
+        $package = json_decode($files->get($root.'/package.json'), true, flags: JSON_THROW_ON_ERROR);
+        expect($package['overrides']['vitest'])->toBe('5.0.1');
         expect($installer->inspect()['changes'])->toBe([])
             ->and($files->get($root.'/app/Models/User.php'))->toContain('HasRoles');
         $installer->install();
@@ -85,4 +87,4 @@ it('rejects malformed package metadata and incompatible toolchains before writin
     } finally {
         $files->deleteDirectory($root);
     }
-})->with(['null', '[]', '{"dependencies":"invalid"}', '{"devDependencies":{"vite-plus":"2.0.0"}}']);
+})->with(['null', '[]', '{"dependencies":"invalid"}', '{"devDependencies":{"vite-plus":"2.0.0"}}', '{"overrides":{"vitest":"5.1.0"}}', '{"devDependencies":{"vitest":"^5.1.0"}}']);

@@ -148,7 +148,11 @@ class ComposerModuleAutoloader implements ModuleAutoloader
 
     protected function compiledLoader(ClassLoader $loader): ModuleClassMapLoader
     {
-        self::$compiledLoaders ??= new WeakMap;
+        if (self::$compiledLoaders === null) {
+            /** @var WeakMap<ClassLoader, ModuleClassMapLoader> $loaders */
+            $loaders = new WeakMap;
+            self::$compiledLoaders = $loaders;
+        }
 
         if (! isset(self::$compiledLoaders[$loader])) {
             $moduleLoader = new ModuleClassMapLoader;
