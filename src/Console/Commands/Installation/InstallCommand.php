@@ -99,7 +99,7 @@ class InstallCommand extends Command
             if (! $this->option('skip-frontend')) {
                 foreach ([['npm', 'install'], ['npm', 'run', 'bedrock:build']] as $command) {
                     if (! $this->runProcess($command)) {
-                        $this->components->warn('Files are prepared. Install Node 24.11+ and npm, then run npm install && npm run bedrock:build.');
+                        $this->components->warn('Files are prepared. Install Node 26.13+ and npm, then run npm install && npm run bedrock:build.');
 
                         return self::FAILURE;
                     }

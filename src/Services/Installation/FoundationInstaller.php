@@ -124,6 +124,16 @@ class FoundationInstaller
         $section = isset($package['dependencies']['vite']) ? 'dependencies' : 'devDependencies';
         $package[$section]['vite'] = $vite;
         $package['overrides']['vite'] = $vite;
+
+        if (isset($package['overrides']['vitest']) && $package['overrides']['vitest'] !== '5.0.1') {
+            throw new RuntimeException('Conflict: package.json overrides.vitest. Align it with the supported Vite+ toolchain manually.');
+        }
+        foreach (['dependencies', 'devDependencies'] as $dependencySection) {
+            if (isset($package[$dependencySection]['vitest']) && $package[$dependencySection]['vitest'] !== '5.0.1') {
+                throw new RuntimeException('Conflict: existing vitest version. Align it with the supported 5.0.1 toolchain manually.');
+            }
+        }
+        $package['overrides']['vitest'] = '5.0.1';
         foreach (['bedrock:dev' => 'vp dev --config vite.bedrock.config.ts', 'bedrock:build' => 'vp build --config vite.bedrock.config.ts'] as $name => $command) {
             if (isset($package['scripts'][$name]) && $package['scripts'][$name] !== $command) {
                 throw new RuntimeException("Conflict: package.json scripts.{$name} already exists.");

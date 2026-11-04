@@ -300,7 +300,8 @@ publishes browser files to `public/vendor/bedrock/modules/<key>/<version>` and S
 ### 10. Integrate a React/Inertia host
 
 The supported host is Laravel 13 with React 19, Inertia 3, TypeScript, Tailwind 4,
-Node 24 LTS, and Vite+ 1.0. Run `vp migrate` at the application root before integrating
+Node 26 LTS, and Vite+ 1.0. The foundation installer pins the npm Vitest override
+to 5.0.1 for Vite+ 1.0.0 peer compatibility and rejects conflicting existing versions. Run `vp migrate` at the application root before integrating
 an existing Vite host. On a recognized React starter-kit layout:
 
 ```bash
