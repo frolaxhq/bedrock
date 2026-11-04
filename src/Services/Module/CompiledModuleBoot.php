@@ -126,6 +126,7 @@ class CompiledModuleBoot
     /** Only consulted after this request has accepted a verified snapshot. */
     public function resourceExists(string $provider, string $path): ?bool
     {
+        $path = str_replace('\\', '/', $path);
         $value = $this->snapshot['resources'][$provider][$path] ?? null;
 
         // read() validates the request snapshot; rejection and invalidation clear it.
@@ -197,7 +198,7 @@ class CompiledModuleBoot
 
                     if (is_string($root) && $root !== '') {
                         foreach (['/resources/views', '/lang'] as $suffix) {
-                            $resources[$provider][$root.$suffix] = is_dir($root.$suffix);
+                            $resources[$provider][str_replace('\\', '/', $root.$suffix)] = is_dir($root.$suffix);
                         }
                     }
                 }

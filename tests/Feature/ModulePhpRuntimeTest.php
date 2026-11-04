@@ -506,6 +506,7 @@ it('warms conventional provider resources while leaving unknown paths dynamic', 
         $this->artisan('module:cache', ['--warm' => true])->assertSuccessful();
         $boot = app(CompiledModuleBoot::class);
         expect($boot->read())->not->toBeNull();
+        expect($boot->resourceExists($manifest->provider, str_replace('/', '\\', $path.'/src/../resources/views')))->toBeTrue();
         expect($boot->resourceExists($manifest->provider, $path.'/src/../resources/views'))->toBeTrue()
             ->and($boot->resourceExists($manifest->provider, $path.'/src/../lang'))->toBeFalse()
             ->and($boot->resourceExists($manifest->provider, $path.'/custom/views'))->toBeNull();
